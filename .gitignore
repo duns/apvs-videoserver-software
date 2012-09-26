@@ -1,3 +1,5 @@
+gst-testsink/bin
+
 # Compiled Object files
 *.slo
 *.lo
