@@ -14,5 +14,5 @@
 /**
  * @defgroup server-modules Server Modules
  * @brief This section contains rc server modules.
- * Server-side services for controling and receiving data from ptus.
+ * Server-side services for controling ptus and receiving ptu data.
  */

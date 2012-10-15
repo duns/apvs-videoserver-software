@@ -1,4 +1,0 @@
-#!/bin/bash
-
-gst-launch -v tcpserversrc host=192.168.1.2 port=5000 ! gdpdepay ! tee name=tee1 ! ffdec_h264 ! identity ! ffmpegcolorspace ! timeoverlay halign=right ! clockoverlay halign=right valign=bottom shaded-background=true time-format="%H:%M:%S" ! v4l2sink device=/dev/video0 sync=false tee1. ! queue ! mpegtsmux ! multifilesink location=/home/kostas/workspace/streaming_output/worker0-`date +"%F-%H.%M.%S"`-%06d.ts next-file=1 
-#gst-launch -v tcpserversrc host=192.168.1.2 port=5000 ! gdpdepay ! tee name=tee1 ! ffdec_h264 ! identity ! videomixer name=mix ! ffmpegcolorspace ! timeoverlay halign=right ! clockoverlay halign=right valign=bottom shaded-background=true time-format="%H:%M:%S" ! v4l2sink device=/dev/video0 sync=false filesrc location=/home/kostas/Pictures/gow4_640x480.png ! decodebin2 ! imagefreeze ! mix. tee1. ! queue ! mpegtsmux ! multifilesink location=/home/kostas/workspace/streaming_output/worker0-`date +"%F-%H.%M.%S"`-%06d.ts next-file=1 

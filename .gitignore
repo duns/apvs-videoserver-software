@@ -1,4 +1,4 @@
-gst-testsink/bin
+videosink/bin
 
 # Compiled Object files
 *.slo

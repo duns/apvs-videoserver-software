@@ -15,20 +15,23 @@ LIBS       = -lgstreamer-0.10 \
 
 EXTRA_DIST = doxygen.conf
 
+VIDEOSINKOBJ = src/videosink.o
+VIDEOSINKBIN = bin/videosink
+
 # Setup implicit pattern rules
 
-src/%.o : src/%.cpp
+src/%.o : src/%.cpp src/%.hpp
 	$(CC) -c $(OFLAGS) $(CFLAGS) $(OPTFLAG) $(CPPPATH) $< -o $@ 
 
 # Setup static rules
 
-all: gst-test_sink 
+all: videosink 
 
 binary_dir: 
 	mkdir -p bin
 
-gst-test_sink: src/gst-test_sink.o binary_dir
-	$(CC) $(OFLAGS) src/gst-test_sink.o $(LIBS) -o bin/gst-test_sink
+videosink: $(VIDEOSINKOBJ) binary_dir
+	$(CC) $(OFLAGS) $(VIDEOSINKOBJ) $(LIBS) -o $(VIDEOSINKBIN) 
 
 # Build documentation
 

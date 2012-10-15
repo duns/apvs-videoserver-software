@@ -1,52 +1,58 @@
 // -------------------------------------------------------------------------------------------------------------
-// gst-test_sink.hpp
+// videosink.hpp
 // -------------------------------------------------------------------------------------------------------------
 // Author(s)     : Kostas Tzevanidis
 // Contact       : ktzevanid@gmail.com
-// Last revision : June 2012
+// Last revision : October 2012
 // -------------------------------------------------------------------------------------------------------------
 
 /**
- * @file gst-test_sink.hpp
- * @ingroup nc_tcp_sink
- * @brief Type declarations and global function definitions for TCP video streaming sink prototype.
+ * @defgroup video_sink Gstreamer video sink
+ * @ingroup video_streamer
+ * @brief Gstreamer video sink module.
  */
 
-#ifndef GST_TEST_SINK_HPP
-#define GST_TEST_SINK_HPP
+/**
+ * @file videosink.hpp
+ * @ingroup video_sink
+ * @brief Type declarations and global function definitions for video streaming sink module.
+ */
+
+#ifndef VIDEOSINK_HPP
+#define VIDEOSINK_HPP
 
 #include <gstreamermm.h>
 #include <boost/tuple/tuple.hpp>
 #include <boost/thread.hpp>
 
-#include "gst-test_common.hpp"
+#include "gst-common.hpp"
 
 /**
- * @ingroup nc_tcp_sink
+ * @ingroup video_sink
  * @brief Fraction of a second (i.e. 1/QOS_TIME_SLICE in sec)
  */
 #define QOS_TIME_SLICE 500
 
-namespace nc_tcp_video_streamer_prot
+namespace video_streamer
 {
 	// tuple types for multiple parameter passing through legacy pointer args
 
 	/**
- 	 * @ingroup nc_tcp_sink
+ 	 * @ingroup video_sink
 	 * @brief Type of data associated to pipeline's bus messages. 
 	 */
-	typedef boost::tuple<GMainLoop*, GstElement*, bool*, boost::mutex*> bmsg;
+	typedef boost::tuple<GMainLoop*, element_set*, bool*, boost::mutex*> bmsg;
 
 	/**
- 	 * @ingroup nc_tcp_sink
+ 	 * @ingroup video_sink
 	 * @brief Type of data associated to messages received from Identity element.
 	 */
-	typedef boost::tuple<GstElement*, boost::mutex*, int*, bool*> dbmsg;
+	typedef boost::tuple<boost::mutex*, int*, bool*> dbmsg;
 
 	// triggers at every data buffer passing through the pipeline
 
 	/**
- 	 * @ingroup nc_tcp_sink
+ 	 * @ingroup video_sink
 	 * @brief Identity 'receive-buffer' handler
          * This callback is being invoked every time a data buffer passes through the Gstreamer Identity
 	 * element. The signal besides a reference of the data buffer can also carry arbitrary user
@@ -64,37 +70,28 @@ namespace nc_tcp_video_streamer_prot
 	{
 		dbmsg* m_data = static_cast<dbmsg*>( user_data );
 
-		boost::lock_guard<boost::mutex> lock( *m_data->get<1>() );
+		boost::lock_guard<boost::mutex> lock( *m_data->get<0>() );
 
-		if( !*m_data->get<3>() )
+		if( !*m_data->get<2>() )
 		{
-			GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( m_data->get<0>() ) );
+			GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( identity ) );
 			GstBus* bus = gst_pipeline_get_bus( GST_PIPELINE( pipeline ) );
 
-			GstStructure* state_pause  = gst_structure_new( "pause", "p", G_TYPE_STRING, "p", NULL );
-			GstStructure* state_switch = gst_structure_new( "switch", "p", G_TYPE_STRING, "s", NULL );
-			GstStructure* state_play = gst_structure_new( "play", "p", G_TYPE_STRING, "P", NULL );
+			GstMessage* msg_switch = gst_message_new_custom( GST_MESSAGE_ELEMENT, GST_OBJECT( identity )
+				, gst_structure_new( "switch_stream", "p", G_TYPE_STRING, "p", NULL ) );
 
-			GstMessage* msg_pause = gst_message_new_custom( GST_MESSAGE_ELEMENT, GST_OBJECT( identity ), state_pause );
-			GstMessage* msg_switch = gst_message_new_custom( GST_MESSAGE_ELEMENT, GST_OBJECT( identity ), state_switch );
-			GstMessage* msg_play = gst_message_new_custom( GST_MESSAGE_ELEMENT, GST_OBJECT( identity ), state_play );
-
-			gst_bus_post( bus, msg_pause );
 			gst_bus_post( bus, msg_switch );
-			gst_bus_post( bus, msg_play );
 
 			gst_object_unref( GST_OBJECT( pipeline ) );
 			gst_object_unref( GST_OBJECT( bus ) );
-
-			*m_data->get<3>() = true;
 		}
-		*m_data->get<2>()+= 1;
+		*m_data->get<1>()+= 1;
 	}
 
 	// pipeline bus event handler
 
 	/**
- 	 * @ingroup nc_tcp_sink
+ 	 * @ingroup video_sink
 	 * @brief Gstreamer bus message callback
 	 * This function is registered during pipeline initialization as the pipeline's bus message handler.
 	 * The handler is being invoked every time the pipeline publishes a message on the pipeline bus.
@@ -116,6 +113,8 @@ namespace nc_tcp_video_streamer_prot
 		bmsg* m_data = static_cast<bmsg*>( data );
 
 		GMainLoop* loop = m_data->get<0>();
+		
+		boost::lock_guard<boost::mutex> lock( *m_data->get<3>() );
 
 		switch( GST_MESSAGE_TYPE( msg ) )
 		{
@@ -140,7 +139,7 @@ namespace nc_tcp_video_streamer_prot
 			}
 			else
 			{
-				GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( m_data->get<1>() ) );
+				GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( m_data->get<1>()->networksource ) );
 
 				gst_element_set_state( pipeline, GST_STATE_PLAYING );
 				gst_object_unref( GST_OBJECT( pipeline ) );
@@ -152,66 +151,43 @@ namespace nc_tcp_video_streamer_prot
 
 		case GST_MESSAGE_EOS:
 		{
-			GstElement* isel = m_data->get<1>();
-			GstPad* sink1 = gst_element_get_static_pad( isel, "sink1" );
-
-			g_object_set( G_OBJECT( isel ), "active-pad", sink1, NULL );
-			gst_object_unref( GST_OBJECT( sink1 ) );			
-
-			GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( isel ) ); // get pipeline object
-
-			gst_element_set_state( pipeline, GST_STATE_READY );
-			gst_element_set_state( pipeline, GST_STATE_PLAYING );
-
-			gst_object_unref( GST_OBJECT( pipeline ) );
-
-			*m_data->get<2>() = false; // switch loop flag
 		}
-			break;
-
+		break;
 		case GST_MESSAGE_ELEMENT:
 		{
 			if( !strcmp( msg->src->name, "identity" ) )
 			{
 				const GstStructure* state_struct = gst_message_get_structure( msg );
-				GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( m_data->get<1>() ) );
+				GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( m_data->get<1>()->networksource ) );
 
-				if( !strcmp( gst_structure_get_name( state_struct ), "pause" ) )
+				if( !strcmp( gst_structure_get_name( state_struct ), "switch_stream" ) )
 				{
 					std::cout << "Pausing pipeline..." << std::endl;
-
+				
 					gst_element_set_state( GST_ELEMENT( msg->src ), GST_STATE_NULL ); 
-					gst_element_set_state( GST_ELEMENT( gst_bin_get_by_name( GST_BIN( pipeline ), "iselector" ) )
-						, GST_STATE_NULL ); 
-					gst_element_set_state( GST_ELEMENT( gst_bin_get_by_name( GST_BIN( pipeline ), "ffmpegcs" ) )
-						, GST_STATE_NULL ); 
-					gst_element_set_state( pipeline, GST_STATE_PAUSED );
-				}
-				else if( !strcmp( gst_structure_get_name( state_struct ), "switch" ) )
-				{
+					gst_element_set_state( m_data->get<1>()->iselector, GST_STATE_NULL ); 
+					gst_element_set_state( m_data->get<1>()->ffmpegcs0, GST_STATE_NULL ); 
+
 					std::cout << "Switching pads..." << std::endl;
 
-					GstElement* isel = m_data->get<1>();					
-					GstPad* sink0 = gst_element_get_static_pad( isel, "sink0" );
-
-					g_object_set( G_OBJECT( isel ), "active-pad", sink0, NULL );
-					gst_element_sync_state_with_parent( isel );
-
-					gst_object_unref( GST_OBJECT( sink0 ) ); 
-				}
-				else if( !strcmp( gst_structure_get_name( state_struct ), "play" ) )
-				{
+					g_object_set( G_OBJECT( m_data->get<1>()->iselector )
+						, "active-pad", m_data->get<1>()->sel_sink0
+						, NULL );
+					
 					std::cout << "Restarting pipeline..." << std::endl;
 
+					GST_DEBUG_BIN_TO_DOT_FILE( GST_BIN( pipeline ), GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "switch" );					
 					gst_element_set_state( pipeline, GST_STATE_PLAYING );
 				}
-			
+				
 				g_object_unref( G_OBJECT( pipeline ) );
+				
+				*m_data->get<2>() = true;
 			}
 		}
 		break;
 		default:
-			std::cerr << "Unhandled message send by: " << msg->src->name << std::endl;
+			//std::cerr << "Unhandled message send by: " << msg->src->name << std::endl;
 			break;
 		}
 
@@ -221,13 +197,13 @@ namespace nc_tcp_video_streamer_prot
 	// watchdog threads' process
 
 	/**
- 	 * @ingroup nc_tcp_sink
+ 	 * @ingroup video_sink
 	 * @brief Watch-dog thread loop 
 	 *
 	 * The watch-dog thread periodically tests the loop flag along with the number of data packets 
 	 * received in the time space between current and last check, in order to determine whether the 
 	 * connection is lost  or its quality has been dramatically deteriorated. If one of the previous 
-	 * mentioned conditions is true it switches from the tcp stream to a dummy one and resets the
+	 * mentioned conditions is true it switches from the network stream to a dummy one and resets the
 	 * pipeline to defaults.
 	 *
 	 * @sa <a href="gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer-plugins/html/gstreamer
@@ -239,7 +215,7 @@ namespace nc_tcp_video_streamer_prot
 	 * @param mutex a pointer to a mutex provided by the executing pipeline
 	 */
 	static void
-	watch_loop( GstElement* iselector, bool* loop_flag, int* com_pkgs, boost::mutex* mutex )
+	watch_loop( element_set* elements, bool* loop_flag, int* com_pkgs, boost::mutex* mutex )
 	{
 		while( true )
 		{
@@ -248,18 +224,18 @@ namespace nc_tcp_video_streamer_prot
 
 			if( !*com_pkgs && *loop_flag )
 			{
+				std::cout << "Watchdog switching pads..." << std::endl;
+
 				*loop_flag = false;
-
-				GstPad* sink1 = gst_element_get_static_pad( iselector, "sink1" );
-
-				g_object_set( G_OBJECT( iselector ), "active-pad", sink1, NULL );
-
-				gst_object_unref( GST_OBJECT( sink1 ) );
-
-				// get a pointer to the pipeline
-
-				GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( iselector ) ); 
-
+				
+				GstElement* pipeline = GST_ELEMENT( gst_element_get_parent( elements->iselector ) ); 
+					
+				g_object_set( G_OBJECT( elements->iselector )
+					, "active-pad", elements->sel_sink1 
+					, NULL );
+					
+				GST_DEBUG_BIN_TO_DOT_FILE( GST_BIN( pipeline ), GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "switch_local" );
+					
 				gst_element_set_state( pipeline, GST_STATE_READY );
 				gst_element_set_state( pipeline, GST_STATE_PLAYING );
 
@@ -271,4 +247,4 @@ namespace nc_tcp_video_streamer_prot
 	}
 }
 
-#endif /* GST_TEST_SINK_HPP */
+#endif /* VIDEOSINK_HPP */
