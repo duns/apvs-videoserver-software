@@ -6,7 +6,6 @@
 // Last revision : October 2012
 // -------------------------------------------------------------------------------------------------------------
 
-
 /**
  * @file videosink.cpp
  * @ingroup video_sink
@@ -32,32 +31,33 @@
 
 /**
  * @ingroup video_sink
+ * @brief Default path of the video sink configuration file.
+ */
+#define CFG_SINK_PATH "/etc/videostream.conf/vsink.conf"
+
+using namespace video_streamer;
+using namespace video_sink;
+
+auxiliary_libraries::log_level global_log_level = log_info;
+
+/**
+ * @ingroup video_sink
  * @brief Gstreamer video sink entry point.
  */
 int
 main( int argc, char* argv[] )
 {
-	boost::mutex mutex;
-
-	int com_pkgs = 0;
-	bool loop_flag = false;
-
-	// initialize program loop
-
 	GMainLoop* loop = g_main_loop_new( NULL, false );
 
 	if( !loop )
 	{
-		std::cerr << "Cannot initiate program loop." << std::cerr;
+		LOG_CLOG( log_error ) << "Cannot initiate program loop.";
 		return EXIT_FAILURE;
 	}
 
 	try
 	{
 		namespace app_opts = boost::program_options;
-		using namespace video_streamer;
-
-		// configure, setup and parse program options
 
 		std::stringstream sstr;
 
@@ -68,13 +68,12 @@ main( int argc, char* argv[] )
 			 << "receives through network a video stream to a selected port and" << std::endl
 			 << "propagates it to a virtual pre-configured video device";
 
-		app_opts::options_description desc ( sstr.str() );
-		app_opts::options_description conf_desc( "" );
+		app_opts::options_description desc( sstr.str() ), conf_desc( "" );
 		app_opts::variables_map opts_map;
 
 		desc.add_options()
 			( "help", "produce this message" )
-			( "config-path", app_opts::value<std::string>()->default_value( "/etc/videostream.conf/vsink.conf" )
+			( "config-path", app_opts::value<std::string>()->default_value( CFG_SINK_PATH )
 				, "Sets the configuration file path." )
 		;
 		
@@ -88,36 +87,38 @@ main( int argc, char* argv[] )
 		}
 
 		conf_desc.add_options()
-			( "connection.transfer-protocol", app_opts::value<std::string>(), "" )
-			( "connection.localhost", app_opts::value<std::string>(), "" )
-			( "connection.port", app_opts::value<int>(), "" )
-			( "localvideosource.pattern", app_opts::value<int>(), "" )
-			( "localvideosource.video-header", app_opts::value<std::string>(), "" )
-			( "localvideosource.width", app_opts::value<int>(), "" )
-			( "localvideosource.height", app_opts::value<int>(), "" )
-			( "localvideosource.framerate-num", app_opts::value<int>(), "" )
-			( "localvideosource.framerate-den", app_opts::value<int>(), "" )
-			( "localvideosource.fourcc-format0", app_opts::value<char>(), "" )
-			( "localvideosource.fourcc-format1", app_opts::value<char>(), "" )
-			( "localvideosource.fourcc-format2", app_opts::value<char>(), "" )
-			( "localvideosource.fourcc-format3", app_opts::value<char>(), "" )
-			( "localvideosource.interlaced", app_opts::value<bool>(), "" )
-			( "videobackup.location", app_opts::value<std::string>(), "" )
-			( "videobackup.pattern", app_opts::value<std::string>(), "" )
-			( "capturedevice.name", app_opts::value<std::string>(), "" )
-			( "imageoverlay.location", app_opts::value<std::string>(), "" )
-			( "timeoverlay.halignment", app_opts::value<int>(), "" )
-			( "clockoverlay.halignment", app_opts::value<int>(), "" )
-			( "clockoverlay.valignment", app_opts::value<int>(), "" )
-			( "clockoverlay.shaded-background", app_opts::value<bool>(), "" )
-			( "clockoverlay.time-format", app_opts::value<std::string>(), "" )
+			( "connection.transfer-protocol"   , app_opts::value<std::string>(), "" )
+			( "connection.localhost"           , app_opts::value<std::string>(), "" )
+			( "connection.port"                , app_opts::value<int>()        , "" )
+			( "localvideosource.pattern"       , app_opts::value<int>()        , "" )
+			( "localvideosource.video-header"  , app_opts::value<std::string>(), "" )
+			( "localvideosource.width"         , app_opts::value<int>()        , "" )
+			( "localvideosource.height"        , app_opts::value<int>()        , "" )
+			( "localvideosource.framerate-num" , app_opts::value<int>()        , "" )
+			( "localvideosource.framerate-den" , app_opts::value<int>()        , "" )
+			( "localvideosource.fourcc-format0", app_opts::value<char>()       , "" )
+			( "localvideosource.fourcc-format1", app_opts::value<char>()       , "" )
+			( "localvideosource.fourcc-format2", app_opts::value<char>()       , "" )
+			( "localvideosource.fourcc-format3", app_opts::value<char>()       , "" )
+			( "localvideosource.interlaced"    , app_opts::value<bool>()       , "" )
+			( "videobackup.location"           , app_opts::value<std::string>(), "" )
+			( "videobackup.pattern"            , app_opts::value<std::string>(), "" )
+			( "capturedevice.name"             , app_opts::value<std::string>(), "" )
+			( "imageoverlay.location"          , app_opts::value<std::string>(), "" )
+			( "timeoverlay.halignment"         , app_opts::value<int>()        , "" )
+			( "clockoverlay.halignment"        , app_opts::value<int>()        , "" )
+			( "clockoverlay.valignment"        , app_opts::value<int>()        , "" )
+			( "clockoverlay.shaded-background" , app_opts::value<bool>()       , "" )
+			( "clockoverlay.time-format"       , app_opts::value<std::string>(), "" )
+			( "execution.messages-detail"      , app_opts::value<int>()        , "" )
+			( "execution.watchdog-awareness"   , app_opts::value<int>()        , "" )
 		;
 
 		std::ifstream config_file( opts_map["config-path"].as<std::string>().c_str() );
 
 		if( !config_file )
 		{
-			std::cout << "Configuration file not found. Exiting..." << std::endl;
+			LOG_CLOG( log_error ) << "Configuration file not found. Exiting...";
 			return EXIT_FAILURE;
 		}
 
@@ -126,132 +127,83 @@ main( int argc, char* argv[] )
 
 		config_file.close();
 
-		if( opts_map["connection.transfer-protocol"].empty()
-		 || opts_map["connection.localhost"].empty()     
-		 || opts_map["connection.port"].empty() 
-		 || opts_map["localvideosource.pattern"].empty() 
-	   	 || opts_map["localvideosource.video-header"].empty()
-		 || opts_map["localvideosource.width"].empty() 	 
-		 || opts_map["localvideosource.height"].empty() 
-		 || opts_map["localvideosource.framerate-num"].empty()  
-		 || opts_map["localvideosource.framerate-den"].empty() 
-		 || opts_map["localvideosource.fourcc-format0"].empty() 
-		 || opts_map["localvideosource.fourcc-format1"].empty() 
-		 || opts_map["localvideosource.fourcc-format2"].empty() 
-		 || opts_map["localvideosource.fourcc-format3"].empty() 
-		 || opts_map["localvideosource.interlaced"].empty() 
-		 || opts_map["videobackup.location"].empty()
-		 || opts_map["videobackup.pattern"].empty() 
-		 || opts_map["capturedevice.name"].empty() 
-		 || opts_map["imageoverlay.location"].empty() 
-		 || opts_map["timeoverlay.halignment"].empty()   
-		 || opts_map["clockoverlay.halignment"].empty()
-		 || opts_map["clockoverlay.valignment"].empty()  
-		 || opts_map["clockoverlay.shaded-background"].empty() 
-		 || opts_map["clockoverlay.time-format"].empty() ) 
+		bool param_flag = true;
+		auto opts_vector = conf_desc.options();
+		typedef boost::shared_ptr<app_opts::option_description> podesc_type;
+
+		std::for_each( opts_vector.begin(), opts_vector.end()
+				, [&global_log_level, &opts_map, &param_flag] ( podesc_type& arg ) -> void
+				{
+					auto cur_opt = arg.get()->format_name().substr(2, arg.get()->format_name().length() - 2);
+					if( opts_map[cur_opt].empty() )
+					{
+						LOG_CLOG( log_error ) << "Parameter '" << cur_opt << "' is not properly set.";
+						param_flag = false;
+					}
+				} );
+
+		if( !param_flag )
 		{
-			std::cout << "You must properly set the configuration options." <<  std::endl;
+			LOG_CLOG( log_error ) << "Invalid configuration. Exiting...";
 			return EXIT_FAILURE;
 		}
 
-		// initialize Gstreamer
+		global_log_level = static_cast<auxiliary_libraries::log_level>(
+			opts_map["execution.messages-detail"].as<int>() );
+
+		LOG_CLOG( log_info ) << "Initializing Gstreamer...";
 
 		gst_init( &argc, &argv );
 
-		// instantiate pipeline
+		LOG_CLOG( log_info ) << "Constructing pipeline...";
 
-		gstbin_pt pipeline( GST_BIN( gst_pipeline_new( "tcpvideosink" ) ), cust_deleter<GstBin>() );
+		videosink_pipeline videosink( opts_map );
 		
-		element_set elements( opts_map );
-		
-		gst_bin_add_many( pipeline.get()
-			, elements.h264dec,       elements.identity,      elements.iselector
-			, elements.ffmpegcs0,     elements.timeoverlay,   elements.clockoverlay
-			, elements.networksource, elements.gdpdepay,      elements.tee
-			, elements.videosource,   elements.v4l2sink,      elements.avimux
-			, elements.filesink,      elements.coglogoinsert, elements.queue0
-			, elements.queue1
-			, NULL );	
+		if( global_log_level > log_warning )
+			GST_DEBUG_BIN_TO_DOT_FILE( GST_BIN( videosink.root_bin.get() )
+				, GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "pipeline-schema" );
 
-		gst_element_link_many( elements.networksource, elements.gdpdepay, elements.tee, NULL );
+		LOG_CLOG( log_info ) << "Registering callbacks...";
 
-		gst_element_link_many( elements.queue1, elements.h264dec, elements.identity
-			, elements.ffmpegcs0, elements.timeoverlay, elements.clockoverlay
-			, elements.coglogoinsert, elements.iselector, elements.v4l2sink, NULL );
-		
-		gst_element_link( elements.avimux, elements.filesink );
-		insert_filter( elements.videosource, elements.iselector, opts_map );
+		boost::mutex mutex;
+		int com_pkgs = 0;
+		bool loop_flag = false;
 
-		gst_element_link( elements.avimux, elements.filesink );	
-	
-		elements.sel_sink0 = gst_element_get_static_pad( elements.iselector, "sink0" );
-		elements.sel_sink1 = gst_element_get_static_pad( elements.iselector, "sink1" );	
-		
-		GstPad *tee_src0, *tee_src1;
-		GstPad *queue0_src, *queue0_sink, *queue1_sink;
-		GstPad *avimux_sink;
-
-		tee_src0 = gst_element_get_request_pad( elements.tee, "src%d" );
-		tee_src1 = gst_element_get_request_pad( elements.tee, "src%d" );
-		queue0_sink = gst_element_get_static_pad( elements.queue0, "sink" );
-		queue0_src = gst_element_get_static_pad( elements.queue0, "src" );
-		queue1_sink = gst_element_get_static_pad( elements.queue1, "sink" );
-		avimux_sink = gst_element_get_request_pad( elements.avimux, "video_%d" );
-
-		gst_pad_link( tee_src0, queue0_sink );
-		gst_pad_link( tee_src1, queue1_sink ); 
-		gst_pad_link( queue0_src, avimux_sink );
-
-		gst_object_unref( tee_src0 );
-		gst_object_unref( tee_src1 );
-		gst_object_unref( queue0_sink );
-		gst_object_unref( queue0_src );
-		gst_object_unref( queue1_sink );
-		gst_object_unref( avimux_sink );
-	
-		GST_DEBUG_BIN_TO_DOT_FILE( GST_BIN( pipeline.get() ), GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "init" );
-
-		// register pipelines' bus handler
-
-		bmsg bmsg_p = boost::make_tuple( loop, &elements, &loop_flag, &mutex );
+		vs_params c_params = boost::make_tuple( &mutex, &videosink, &com_pkgs, &loop_flag );
 
 		{
-			gstbus_pt pipe_bus( gst_pipeline_get_bus( GST_PIPELINE( pipeline.get() ) )
-				, cust_deleter<GstBus>() );
+			gstbus_pt pipe_bus(	gst_pipeline_get_bus( GST_PIPELINE( videosink.root_bin.get() ) )
+				  , cust_deleter<GstBus>() );
 
-			gst_bus_add_watch( pipe_bus.get(), pipeline_bus_handler
-				, static_cast<gpointer>( &bmsg_p ) );
+			gst_bus_add_watch( pipe_bus.get(), pipeline_bus_handler, static_cast<gpointer>( &c_params ) );
 		}
 
-		// register identity's receive callback
+		g_signal_connect( videosink.elements["identity"], "handoff", G_CALLBACK( identity_handler )
+			, static_cast<gpointer>( &c_params ) );
 
-		dbmsg identity_param = boost::make_tuple( &mutex, &com_pkgs, &loop_flag );
+		LOG_CLOG( log_info ) << "Initializing watchdog...";
 
-		g_signal_connect( elements.identity, "handoff", G_CALLBACK( identity_handler )
-			, static_cast<gpointer>( &identity_param ) );
-
-		// start pipeline
-
-		gst_element_set_state( GST_ELEMENT( pipeline.get() ), GST_STATE_PLAYING );
-
-		// issue a watchdog thread
-
-		auto watch_cfg = boost::bind( watch_loop, &elements, &loop_flag, &com_pkgs, &mutex );
+		auto watch_cfg = boost::bind( watch_loop, &videosink, &loop_flag, &com_pkgs, &mutex
+			, opts_map["execution.watchdog-awareness"].as<int>() );
 
 		boost::thread watch_thread( watch_cfg );
 
-		// start program loop
+		LOG_CLOG( log_info ) << "Starting pipeline...";
 
+		gst_element_set_state( GST_ELEMENT( videosink.root_bin.get() ), GST_STATE_PLAYING );
 		g_main_loop_run( loop );
-
-		gst_object_unref( elements.sel_sink0 );
-		gst_object_unref( elements.sel_sink1 );
 	
-		gst_element_set_state( GST_ELEMENT( pipeline.get() ), GST_STATE_NULL );
+		LOG_CLOG( log_info ) << "Destroying pipeline...";
+
+		gst_element_set_state( GST_ELEMENT( videosink.root_bin.get() ), GST_STATE_NULL );
 	}
 	catch( const boost::exception& e )
 	{
-		std::cerr << boost::diagnostic_information( e );
+		LOG_CLOG( log_debug_1 ) << boost::diagnostic_information( e );
+		LOG_CLOG( log_error ) << "Fatal error occurred. Exiting...";
+
+		g_main_loop_quit( loop );
+
 		return EXIT_FAILURE;
 	}
 
