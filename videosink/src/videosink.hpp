@@ -38,7 +38,7 @@ namespace video_sink
  	 * @ingroup video_sink
 	 * @brief Type of pipeline's callback parameters.
 	 */
-	typedef boost::tuple<boost::mutex*, videosink_pipeline*, int*, bool*> vs_params;
+	typedef boost::tuple<boost::mutex*, videosink_pipeline*, int*, bool*, GMainLoop*> vs_params;
 
 	/**
  	 * @ingroup video_sink
@@ -66,8 +66,8 @@ namespace video_sink
 			LOG_CLOG( log_info ) << "Network activity observed...";
 			GstBus* bus = gst_pipeline_get_bus( GST_PIPELINE( m_data->get<1>()->root_bin.get() ) );
 			GstMessage* msg_switch = gst_message_new_custom(
-										GST_MESSAGE_ELEMENT, GST_OBJECT( identity )
-									  , gst_structure_new( "switch_stream", "p", G_TYPE_STRING, "p", NULL ) );
+				GST_MESSAGE_ELEMENT, GST_OBJECT( identity )
+			  , gst_structure_new( "switch_stream", "p", G_TYPE_STRING, "p", NULL ) );
 			gst_bus_post( bus, msg_switch );
 			gst_object_unref( GST_OBJECT( bus ) );
 		}
@@ -115,9 +115,8 @@ namespace video_sink
 			g_error_free( err );
 			g_free( err_str );
 
-			gst_element_set_state( GST_ELEMENT( m_data->get<1>()->root_bin.get() ), GST_STATE_NULL );
 			LOG_CLOG( log_error ) << "'" << msg->src->name << "' threw a: " << GST_MESSAGE_TYPE_NAME( msg );
-
+			gst_element_set_state( GST_ELEMENT( m_data->get<1>()->root_bin.get() ), GST_STATE_NULL );
 			BOOST_THROW_EXCEPTION( bus_error() << bus_info( err_msg ) );
 		}
 		break;

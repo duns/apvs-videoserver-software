@@ -16,10 +16,15 @@
 #define VIDEOSINK_PIPELINE_HPP
 
 #include <gst/gst.h>
+#include <sstream>
 #include <boost/program_options.hpp>
+#include <boost/date_time.hpp>
+#include <boost/filesystem.hpp>
 
 #include "log.hpp"
 #include "videostreamer_common.hpp"
+
+#define AVI_DT_NAMING "%y%m%d-%H.%M.%S.avi"
 
 namespace video_sink
 {
@@ -113,13 +118,12 @@ namespace video_sink
 			create_add_element( root_bin, elements, "queue2", "queue0" );
 			create_add_element( root_bin, elements, "queue2", "queue1" );
 			create_add_element( root_bin, elements, "avimux", "avimux" );
-			create_add_element( root_bin, elements, "multifilesink", "filesink" );
+			create_add_element( root_bin, elements, "filesink", "filesink" );
 			create_add_element( root_bin, elements, "ffdec_h264", "h264dec" );
 			create_add_element( root_bin, elements, "identity", "identity" );
 			create_add_element( root_bin, elements, "input-selector", "iselector" );
 			create_add_element( root_bin, elements, "ffmpegcolorspace", "ffmpegcs0" );
 			create_add_element( root_bin, elements, "timeoverlay", "timeoverlay" );
-			create_add_element( root_bin, elements, "clockoverlay", "clockoverlay" );
 			create_add_element( root_bin, elements, "gdpdepay", "gdpdepay" );
 			create_add_element( root_bin, elements, "tee", "tee" );
 			create_add_element( root_bin, elements, "videotestsrc", "videosource" );
@@ -129,10 +133,11 @@ namespace video_sink
 			if( !gst_element_link_many( elements["networksource"], elements["gdpdepay"], elements["tee"]
 			         , NULL )
 			||  !gst_element_link_many( elements["queue1"], elements["h264dec"], elements["identity"]
-			        , elements["ffmpegcs0"], elements["timeoverlay"], elements["clockoverlay"]
-			        , elements["coglogoinsert"], elements["iselector"], elements["v4l2sink"]
+			        , elements["ffmpegcs0"], elements["timeoverlay"], elements["coglogoinsert"]
+			        , elements["iselector"], elements["v4l2sink"]
 			        , NULL )
-			||  !gst_element_link( elements["avimux"], elements["filesink"] ) )
+			||  !gst_element_link( elements["avimux"], elements["filesink"] )
+			)
 			{
 				LOG_CLOG( log_error ) << "Failed to link elements.";
 				BOOST_THROW_EXCEPTION( api_error() << api_info( "Linking failure." ) );
@@ -140,11 +145,28 @@ namespace video_sink
 
 			insert_filter( elements["videosource"], elements["iselector"], opts_map );
 
+			std::stringstream ss;
+
+			auto dt_facet = new boost::posix_time::time_facet();
+			dt_facet->format( AVI_DT_NAMING );
+
+			ss.imbue( std::locale( std::cout.getloc(), dt_facet ) );
+
+			ss << opts_map["videobackup.output-path"].as<std::string>() << "/"
+			   << opts_map["session-id"].as<std::string>() << "/"
+			   << boost::posix_time::second_clock::local_time();
+
+			boost::filesystem3::path full_path( ss.str() );
+
+			if( !boost::filesystem3::exists( full_path.parent_path() ) )
+			{
+				boost::filesystem3::create_directories( full_path.parent_path() );
+			}
+
 			g_object_set( G_OBJECT( elements["filesink"] )
-				, "location", ( opts_map["videobackup.location"].as<std::string>() + std::string( "/" )
-					          + opts_map["videobackup.pattern"].as<std::string>() ).c_str()
-				, "next-file", 1
-				, "sync", false
+				, "location", ss.str().c_str()
+			    , "append", true
+				, "sync", true
 				, "async", false
 				, NULL );
 
@@ -155,17 +177,11 @@ namespace video_sink
 
 			g_object_set( G_OBJECT( elements["timeoverlay"] )
 				, "halignment", opts_map["timeoverlay.halignment"].as<int>()
+				, "font-desc", opts_map["timeoverlay.font"].as<std::string>().c_str()
 				, NULL );
 
 			g_object_set( G_OBJECT( elements["coglogoinsert"] )
-				, "location", opts_map["imageoverlay.location"].as<std::string>().c_str()
-				, NULL );
-
-			g_object_set( G_OBJECT( elements["clockoverlay"] )
-				, "halignment", opts_map["clockoverlay.halignment"].as<int>()
-				, "valignment", opts_map["clockoverlay.valignment"].as<int>()
-				, "shaded-background", opts_map["clockoverlay.shaded-background"].as<bool>()
-				, "time-format", opts_map["clockoverlay.time-format"].as<std::string>().c_str()
+				, "location", opts_map["imageoverlay.img-location"].as<std::string>().c_str()
 				, NULL );
 
 			g_object_set( G_OBJECT( elements["v4l2sink"] )

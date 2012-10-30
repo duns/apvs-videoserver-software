@@ -1,0 +1,7 @@
+[slot-details]
+id=slot0
+[streaming-ports]
+mjpg=8090
+rtp=8091
+rtsp=8092
+mp4=8093

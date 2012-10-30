@@ -29,16 +29,10 @@
 
 #include "videosink.hpp"
 
-/**
- * @ingroup video_sink
- * @brief Default path of the video sink configuration file.
- */
-#define CFG_SINK_PATH "/etc/videostream.conf/vsink.conf"
-
 using namespace video_streamer;
 using namespace video_sink;
 
-auxiliary_libraries::log_level global_log_level = log_info;
+auxiliary_libraries::log_level global_log_level = log_debug_2;
 
 /**
  * @ingroup video_sink
@@ -48,6 +42,10 @@ int
 main( int argc, char* argv[] )
 {
 	GMainLoop* loop = g_main_loop_new( NULL, false );
+
+	boost::mutex mutex;
+	int com_pkgs = 0;
+	bool loop_flag = false;
 
 	if( !loop )
 	{
@@ -73,8 +71,8 @@ main( int argc, char* argv[] )
 
 		desc.add_options()
 			( "help", "produce this message" )
-			( "config-path", app_opts::value<std::string>()->default_value( CFG_SINK_PATH )
-				, "Sets the configuration file path." )
+			( "config-path", app_opts::value<std::string>(), "Sets the configuration file path." )
+			( "session-id" , app_opts::value<std::string>(), "Session unique identifier."        )
 		;
 		
 		app_opts::store( app_opts::parse_command_line( argc, argv, desc ), opts_map );
@@ -84,6 +82,18 @@ main( int argc, char* argv[] )
 		{
 			std::cout << desc << std::endl;
 			return EXIT_SUCCESS;
+		}
+
+		if( opts_map["config-path"].empty() )
+		{
+			LOG_CLOG( log_error ) << "You must supply a path for the configuration file.";
+			return EXIT_FAILURE;
+		}
+
+		if( opts_map["session-id"].empty() )
+		{
+			LOG_CLOG( log_error ) << "You must supply a valid session identifier.";
+			return EXIT_FAILURE;
 		}
 
 		conf_desc.add_options()
@@ -101,15 +111,11 @@ main( int argc, char* argv[] )
 			( "localvideosource.fourcc-format2", app_opts::value<char>()       , "" )
 			( "localvideosource.fourcc-format3", app_opts::value<char>()       , "" )
 			( "localvideosource.interlaced"    , app_opts::value<bool>()       , "" )
-			( "videobackup.location"           , app_opts::value<std::string>(), "" )
-			( "videobackup.pattern"            , app_opts::value<std::string>(), "" )
+			( "videobackup.output-path"        , app_opts::value<std::string>(), "" )
 			( "capturedevice.name"             , app_opts::value<std::string>(), "" )
-			( "imageoverlay.location"          , app_opts::value<std::string>(), "" )
+			( "imageoverlay.img-location"      , app_opts::value<std::string>(), "" )
 			( "timeoverlay.halignment"         , app_opts::value<int>()        , "" )
-			( "clockoverlay.halignment"        , app_opts::value<int>()        , "" )
-			( "clockoverlay.valignment"        , app_opts::value<int>()        , "" )
-			( "clockoverlay.shaded-background" , app_opts::value<bool>()       , "" )
-			( "clockoverlay.time-format"       , app_opts::value<std::string>(), "" )
+			( "timeoverlay.font"               , app_opts::value<std::string>(), "" )
 			( "execution.messages-detail"      , app_opts::value<int>()        , "" )
 			( "execution.watchdog-awareness"   , app_opts::value<int>()        , "" )
 		;
@@ -158,18 +164,14 @@ main( int argc, char* argv[] )
 		LOG_CLOG( log_info ) << "Constructing pipeline...";
 
 		videosink_pipeline videosink( opts_map );
-		
+
 		if( global_log_level > log_warning )
 			GST_DEBUG_BIN_TO_DOT_FILE( GST_BIN( videosink.root_bin.get() )
 				, GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "pipeline-schema" );
 
 		LOG_CLOG( log_info ) << "Registering callbacks...";
 
-		boost::mutex mutex;
-		int com_pkgs = 0;
-		bool loop_flag = false;
-
-		vs_params c_params = boost::make_tuple( &mutex, &videosink, &com_pkgs, &loop_flag );
+		vs_params c_params = boost::make_tuple( &mutex, &videosink, &com_pkgs, &loop_flag, loop );
 
 		{
 			gstbus_pt pipe_bus(	gst_pipeline_get_bus( GST_PIPELINE( videosink.root_bin.get() ) )
@@ -191,8 +193,9 @@ main( int argc, char* argv[] )
 		LOG_CLOG( log_info ) << "Starting pipeline...";
 
 		gst_element_set_state( GST_ELEMENT( videosink.root_bin.get() ), GST_STATE_PLAYING );
+
 		g_main_loop_run( loop );
-	
+
 		LOG_CLOG( log_info ) << "Destroying pipeline...";
 
 		gst_element_set_state( GST_ELEMENT( videosink.root_bin.get() ), GST_STATE_NULL );

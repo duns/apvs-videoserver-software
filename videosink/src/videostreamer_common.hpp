@@ -98,7 +98,10 @@ namespace video_streamer
 		 */
 		void operator()( T* bin_ref ) const
 		{
-			gst_object_unref( GST_OBJECT( bin_ref ) );
+			while( GST_OBJECT( bin_ref )->refcount > 0 )
+			{
+				gst_object_unref( GST_OBJECT( bin_ref ) );
+			}
 		}
 	};
 

@@ -1,6 +1,6 @@
 [connection]
 transfer-protocol=TCP
-localhost=192.168.1.3
+localhost=10.8.1.6
 port=5000
 [localvideosource]
 video-header=video/x-raw-yuv
@@ -15,19 +15,14 @@ fourcc-format3=0
 interlaced=false
 pattern=1
 [videobackup]
-location=/home/kostas/workspace/streaming_output
-pattern=test_%05d.avi
+output-path=/mnt/datadisk1/videostreams
 [capturedevice]
 name=/dev/video0
 [imageoverlay]
-location=/home/kostas/Pictures/alphatest_640x480.png
+img-location=/home/kostas/tmp/alphatest_640x480.png
 [timeoverlay]
 halignment=2
-[clockoverlay]
-halignment=2 
-valignment=1
-shaded-background=true
-time-format=%H:%M:%S
+font=xxx xxx 13
 [execution]
 messages-detail=1
-watchdog-awareness=500
+watchdog-awareness=1500
