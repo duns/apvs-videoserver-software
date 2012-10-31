@@ -11,6 +11,8 @@ CPPPATH    = -I/usr/include/gstreamer-0.10 \
 LIBS       = -lgstreamer-0.10 \
 	     -lboost_program_options \
 	     -lboost_thread \
+	     -lboost_filesystem \
+	     -lboost_system \
 	     -lglib-2.0
 
 EXTRA_DIST = doxygen.conf
