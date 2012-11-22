@@ -1,6 +1,5 @@
 [connection]
-transfer-protocol=TCP
-localhost=10.8.1.6
+localhost=137.138.61.145
 port=5000
 [localvideosource]
 video-header=video/x-raw-yuv

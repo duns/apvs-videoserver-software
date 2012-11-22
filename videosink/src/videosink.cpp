@@ -97,7 +97,6 @@ main( int argc, char* argv[] )
 		}
 
 		conf_desc.add_options()
-			( "connection.transfer-protocol"   , app_opts::value<std::string>(), "" )
 			( "connection.localhost"           , app_opts::value<std::string>(), "" )
 			( "connection.port"                , app_opts::value<int>()        , "" )
 			( "localvideosource.pattern"       , app_opts::value<int>()        , "" )

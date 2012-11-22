@@ -3,6 +3,7 @@
 # $1 Ptu MAC address
 # $2 Serving Slot ID 
 # $3 Session ID
+# $4 Log file
 
 umask 0000
 
@@ -60,6 +61,7 @@ do
 	fi	
 done < ${CFGPATH}/${SLOTCFG}
 
+echo `date +"%H:%M:%S.%N"` " - Raising Sink" >> ${4}
 ${SINKBIN} --config-path ${CFGPATH}/${1} --session-id ${3} & 
 VSPID=$!
 sleep 2 
@@ -128,6 +130,7 @@ do
 			fi
 		done
 
+		echo `date +"%H:%M:%S.%N"` " - Raising Sink" >> ${4}
 		${SINKBIN} --config-path ${CFGPATH}/${1} --session-id ${3} & 
 		VSPID=$!
 		sleep 2 

@@ -93,27 +93,12 @@ namespace video_sink
 		videosink_pipeline( const boost::program_options::variables_map& opts_map )
 			: root_bin( GST_BIN( gst_pipeline_new( "videosink" ) ), cust_deleter<GstBin>() )
 		{
-			if( !opts_map["connection.transfer-protocol"].as<std::string>().compare( std::string("TCP") ) )
-			{
-				create_add_element( root_bin, elements, "tcpserversrc", "networksource" );
+			create_add_element( root_bin, elements, "tcpserversrc", "networksource" );
 
-				g_object_set( G_OBJECT( elements["networksource"] )
-					, "host", opts_map["connection.localhost"].as<std::string>().c_str()
-					, "port", opts_map["connection.port"].as<int>()
-					, NULL );
-			}
-			else if( !opts_map["connection.transfer-protocol"].as<std::string>().compare( std::string("UDP") ) )
-			{
-				create_add_element( root_bin, elements, "udpsrc", "networksource" );
-
-				g_object_set( G_OBJECT( elements["networksource"] )
-					, "uri"
-					, ( std::string( "udp://" )
-					  + opts_map["connection.localhost"].as<std::string>()
-					  + std::string( ":" )
-					  + boost::lexical_cast<std::string>( opts_map["connection.port"].as<int>() ) ).c_str()
-					, NULL );
-			}
+			g_object_set( G_OBJECT( elements["networksource"] )
+				, "host", opts_map["connection.localhost"].as<std::string>().c_str()
+				, "port", opts_map["connection.port"].as<int>()
+				, NULL );
 
 			create_add_element( root_bin, elements, "queue2", "queue0" );
 			create_add_element( root_bin, elements, "queue2", "queue1" );
