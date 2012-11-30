@@ -170,14 +170,14 @@ namespace video_sink
 	 * @sa <a href="gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer-plugins/html/gstreamer
 -plugins-input-selector.html">Gstreamer input-selector element</a>
 	 *
-	 * @param iselector Gstreamer switching element <em>input-selector</em>
+	 * @param pipeline a pointer to the video streaming pipeline
 	 * @param loop_flag a pointer to a loop flag provided by the executing pipeline
 	 * @param com_pkgs a pointer to the number of packets received between current and last check
 	 * @param mutex a pointer to a mutex provided by the executing pipeline
 	 * @param qos_milli_time sleeping time of each iteration in milliseconds
 	 */
 	static void
-	watch_loop( videosink_pipeline* elements, bool* loop_flag, int* com_pkgs, boost::mutex* mutex
+	watch_loop( videosink_pipeline* pipeline, bool* loop_flag, int* com_pkgs, boost::mutex* mutex
 			, int qos_milli_time )
 	{
 		while( true )
@@ -194,16 +194,16 @@ namespace video_sink
 
 				*loop_flag = false;
 
-				g_object_set( G_OBJECT( elements->elements["iselector"] )
-					, "active-pad", elements->pads["sel_sink1"]
+				g_object_set( G_OBJECT( pipeline->elements["iselector"] )
+					, "active-pad", pipeline->pads["sel_sink1"]
 					, NULL );
-					
+
 				if( global_log_level > log_debug_0 )
-					GST_DEBUG_BIN_TO_DOT_FILE( elements->root_bin.get()
+					GST_DEBUG_BIN_TO_DOT_FILE( pipeline->root_bin.get()
 							, GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "local-flow" );
 					
-				gst_element_set_state( GST_ELEMENT( elements->root_bin.get() ), GST_STATE_READY );
-				gst_element_set_state( GST_ELEMENT( elements->root_bin.get() ), GST_STATE_PLAYING );
+				gst_element_set_state( GST_ELEMENT( pipeline->root_bin.get() ), GST_STATE_READY );
+				gst_element_set_state( GST_ELEMENT( pipeline->root_bin.get() ), GST_STATE_PLAYING );
 			}
 
 			*com_pkgs = 0;

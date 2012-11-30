@@ -18,9 +18,16 @@ output-path=/mnt/datadisk1/videostreams
 [capturedevice]
 name=/dev/video0
 [imageoverlay]
-img-location=/home/kostas/tmp/alphatest_640x480.png
+img-location=/home/kostas/tmp/alphatest_640x480b.png
 [timeoverlay]
 halignment=2
+font=xxx xxx 13
+[clockoverlay]
+enable-clock=true
+halignment=0
+valignment=2
+shaded-background=false
+time-format=%H:%M:%S
 font=xxx xxx 13
 [execution]
 messages-detail=1
