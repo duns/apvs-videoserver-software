@@ -1,20 +1,36 @@
 #!/bin/bash
-
-# $1 Ptu MAC address
-# $2 Serving Slot ID 
-# $3 Session ID
-# $4 Log directory
-
+[ -n "$1" ] && exec >> "$1"  2>&1
 umask 0000
+control_c()
+{
+/etc/init.d/videoserver_single stop 0
+/etc/init.d/videoserver_single stop 1
+/etc/init.d/videoserver_single stop 2
+/etc/init.d/videoserver_single stop 3
+exit 0
+#echo PARENT $$
+#PGID=`ps --no-heading -p $$ -o "%r"| awk '{print $1}'`
+#kill -INT -$PGID
+}
+idle()
+{
+while true;
+do
+sleep 10
+done
+}
 
 export GST_DEBUG=2,cog:0
+trap control_c SIGINT
 
-LOGFILENAME=`date +"%y%m%d-%H%M%S"`.log
-
-echo "-------------------- SESSION START (`date`) --------------------" >> ${4}/${LOGFILENAME}
-
-/usr/local/videoserver/videoserver.sh ${1} ${2} ${3} ${4}/${LOGFILENAME} >> ${4}/${LOGFILENAME} 2>&1
-
-echo "******************** SESSION END (`date`) ********************" >> ${4}/${LOGFILENAME}
-
+/etc/init.d/videoserver_single start 0
+/etc/init.d/videoserver_single start 1
+/etc/init.d/videoserver_single start 2
+/etc/init.d/videoserver_single start 3
+#/usr/local/videoserver/videoserver_top.sh 0 /var/log/videoserver &
+#/usr/local/videoserver/videoserver_top_testing.sh 0 /var/log/videoserver &
+#/usr/local/videoserver/videoserver_top_testing.sh 1 /var/log/videoserver &
+#/usr/local/videoserver/videoserver_top_testing.sh 2 /var/log/videoserver &
+#/usr/local/videoserver/videoserver_top_testing.sh 3 /var/log/videoserver 
+idle 
 unset GST_DEBUG
