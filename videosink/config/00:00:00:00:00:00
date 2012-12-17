@@ -32,3 +32,4 @@ font=xxx xxx 13
 [execution]
 messages-detail=1
 watchdog-awareness=1500
+hard-reset=1800000

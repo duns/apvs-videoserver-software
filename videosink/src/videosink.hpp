@@ -122,30 +122,37 @@ namespace video_sink
 		break;
 		case GST_MESSAGE_ELEMENT:
 		{
-			if( !strcmp( msg->src->name, "identity" )
-			 && !strcmp( gst_structure_get_name( gst_message_get_structure( msg ) ), "switch_stream" ) )
+			if( !strcmp( msg->src->name, "identity" ) )
 			{
-				LOG_CLOG( log_info ) << "Setting selected elements to NULL...";
+				if( !strcmp( gst_structure_get_name( gst_message_get_structure( msg ) ), "switch_stream" ) )
+				{
+					LOG_CLOG( log_info ) << "Setting selected elements to NULL...";
 
-				gst_element_set_state( GST_ELEMENT( msg->src ), GST_STATE_NULL );
-				gst_element_set_state( m_data->get<1>()->elements["iselector"], GST_STATE_NULL );
-				gst_element_set_state( m_data->get<1>()->elements["ffmpegcs0"], GST_STATE_NULL );
+					gst_element_set_state( GST_ELEMENT( msg->src ), GST_STATE_NULL );
+					gst_element_set_state( m_data->get<1>()->elements["iselector"], GST_STATE_NULL );
+					gst_element_set_state( m_data->get<1>()->elements["ffmpegcs0"], GST_STATE_NULL );
 
-				LOG_CLOG( log_info ) << "Switching pads...";
+					LOG_CLOG( log_info ) << "Switching pads...";
 
-				g_object_set( G_OBJECT( m_data->get<1>()->elements["iselector"] )
-					, "active-pad", m_data->get<1>()->pads["sel_sink0"]
-					, NULL );
+					g_object_set( G_OBJECT( m_data->get<1>()->elements["iselector"] )
+						, "active-pad", m_data->get<1>()->pads["sel_sink0"]
+						, NULL );
 
-				LOG_CLOG( log_info ) << "Restarting pipeline...";
+					LOG_CLOG( log_info ) << "Restarting pipeline...";
 
-				if( global_log_level > log_debug_0 )
-					GST_DEBUG_BIN_TO_DOT_FILE( m_data->get<1>()->root_bin.get()
-						, GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "net-flow" );
+					if( global_log_level > log_debug_0 )
+						GST_DEBUG_BIN_TO_DOT_FILE( m_data->get<1>()->root_bin.get()
+							, GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "net-flow" );
 
-				gst_element_set_state( GST_ELEMENT( m_data->get<1>()->root_bin.get() ), GST_STATE_PLAYING );
+					gst_element_set_state( GST_ELEMENT( m_data->get<1>()->root_bin.get() ), GST_STATE_PLAYING );
 				
-				*m_data->get<3>() = true;
+					*m_data->get<3>() = true;
+				}
+				else if( !strcmp( gst_structure_get_name( gst_message_get_structure( msg ) ), "hard_reset" ) )
+				{
+					LOG_CLOG( log_info ) << "Hard reset issued.";
+					g_main_loop_quit( m_data->get<4>() );
+				}
 			}
 		}
 		break;
@@ -178,7 +185,7 @@ namespace video_sink
 	 */
 	static void
 	watch_loop( videosink_pipeline* pipeline, bool* loop_flag, int* com_pkgs, boost::mutex* mutex
-			, int qos_milli_time )
+			, int qos_milli_time, int* hr_time, int hr_limit )
 	{
 		while( true )
 		{
@@ -187,6 +194,8 @@ namespace video_sink
 
 			LOG_CLOG( log_debug_2 ) << "Watchdog loop: packets received in " << qos_milli_time
 				<< " milliseconds = " << *com_pkgs;
+
+			*hr_time += qos_milli_time;
 
 			if( !*com_pkgs && *loop_flag )
 			{
@@ -206,7 +215,24 @@ namespace video_sink
 				gst_element_set_state( GST_ELEMENT( pipeline->root_bin.get() ), GST_STATE_PLAYING );
 			}
 
+			if( *com_pkgs )
+			{
+				*hr_time = 0;
+			}
+
 			*com_pkgs = 0;
+
+			if( *hr_time > hr_limit )
+			{
+				LOG_CLOG( log_info ) << "Hard reset time limit reached, signaling destruction...";
+
+				GstBus* bus = gst_pipeline_get_bus( GST_PIPELINE( pipeline->root_bin.get() ) );
+				GstMessage* msg_switch = gst_message_new_custom(
+					GST_MESSAGE_ELEMENT, GST_OBJECT( pipeline->elements["identity"] )
+				  , gst_structure_new( "hard_reset", "p", G_TYPE_STRING, "p", NULL ) );
+				gst_bus_post( bus, msg_switch );
+				gst_object_unref( GST_OBJECT( bus ) );
+			}
 		}
 	}
 }

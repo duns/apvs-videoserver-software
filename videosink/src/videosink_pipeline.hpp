@@ -189,6 +189,8 @@ namespace video_sink
 			create_add_element( root_bin, elements, "v4l2sink", "v4l2sink" );
 			create_add_element( root_bin, elements, "coglogoinsert", "coglogoinsert" );
 			create_add_element( root_bin, elements, "mpegtsdemux", "demux" );
+			create_add_element( root_bin, elements, "videorate", "videorate" );
+			create_add_element( root_bin, elements, "queue2", "queue2" );
 
 			if( !gst_element_link_many( elements["networksource"], elements["tee"], NULL )
 			||  !gst_element_link( elements["queue1"], elements["demux"] ) )
@@ -209,9 +211,10 @@ namespace video_sink
 					, "font-desc", opts_map["clockoverlay.font"].as<std::string>().c_str()
 					, NULL );
 
-				if( !gst_element_link_many( elements["h264dec"], elements["identity"], elements["ffmpegcs0"]
-						, elements["timeoverlay"], elements["clockoverlay"], elements["coglogoinsert"]
-						, elements["iselector"], elements["v4l2sink"], NULL ) )
+				if( !gst_element_link_many( elements["h264dec"], elements["identity"]
+                        , elements["ffmpegcs0"], elements["videorate"], elements["queue2"], elements["timeoverlay"]
+                        , elements["clockoverlay"], elements["coglogoinsert"], elements["iselector"]
+                        , elements["v4l2sink"], NULL ) )
 				{
 					LOG_CLOG( log_error ) << "Failed to link elements.";
 					BOOST_THROW_EXCEPTION( api_error() << api_info( "Linking failure." ) );
@@ -219,14 +222,17 @@ namespace video_sink
 			}
 			else
 			{
-				if( !gst_element_link_many( elements["h264dec"], elements["identity"], elements["ffmpegcs0"]
-						, elements["timeoverlay"], elements["coglogoinsert"], elements["iselector"]
-						, elements["v4l2sink"], NULL ) )
+				if( !gst_element_link_many( elements["h264dec"], elements["identity"]
+                        , elements["ffmpegcs0"], elements["videorate"], elements["queue2"], elements["timeoverlay"]
+                        , elements["coglogoinsert"], elements["iselector"], elements["v4l2sink"], NULL ) )
 				{
 					LOG_CLOG( log_error ) << "Failed to link elements.";
 					BOOST_THROW_EXCEPTION( api_error() << api_info( "Linking failure." ) );
 				}
 			}
+
+			gst_element_unlink( elements["queue2"], elements["timeoverlay"] );
+			insert_video_filter( elements["queue2"], elements["timeoverlay"], opts_map );
 
 			insert_video_filter( elements["videosource"], elements["iselector"], opts_map );
 
