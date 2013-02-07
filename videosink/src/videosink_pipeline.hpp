@@ -122,16 +122,24 @@ namespace video_sink
 
 			GstPad *targetsink = gst_element_get_pad( h264dec, "sink" );
 
-            if( !targetsink )
-            {
-              	LOG_CLOG( log_error ) << "Failed to retrieve decoder pad.";
-              	BOOST_THROW_EXCEPTION( api_error() << api_info( "Pad retrieving error." ) );
-            }
+            		if( !targetsink )
+            		{
+              			LOG_CLOG( log_error ) << "Failed to retrieve decoder pad.";
+		              	BOOST_THROW_EXCEPTION( api_error() << api_info( "Pad retrieving error." ) );
+			}
 
-            gst_pad_link( pad, targetsink );
-            gst_object_unref( targetsink );
-            gst_object_unref( h264dec );
-            gst_object_unref( pipeline );
+			GstBus* bus = gst_pipeline_get_bus( GST_PIPELINE( pipeline ) );
+			GstMessage* msg_switch = gst_message_new_custom( GST_MESSAGE_ELEMENT, GST_OBJECT( element )
+				, gst_structure_new( "demux_created", "p", G_TYPE_STRING, "p", NULL ) );
+			gst_bus_post( bus, msg_switch );
+			gst_object_unref( GST_OBJECT( bus ) );
+
+			gst_pad_link( pad, targetsink );
+			gst_object_unref( targetsink );
+			gst_object_unref( h264dec );
+			gst_object_unref( pipeline );
+	
+			LOG_CLOG( log_debug_1 ) << "Demuxer pad created with success!";
 		}
 		else if( g_strrstr( c, "audio" ) )
 		{

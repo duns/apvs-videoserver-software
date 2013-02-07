@@ -48,7 +48,8 @@ main( int argc, char* argv[] )
 	int com_pkgs = 0
 	  , hr_time = 0;
 
-	bool loop_flag = false;
+	bool loop_flag = false
+	   , active_conn = false;
 
 	if( !loop )
 	{
@@ -180,7 +181,7 @@ main( int argc, char* argv[] )
 
 		LOG_CLOG( log_info ) << "Registering callbacks...";
 
-		vs_params c_params = boost::make_tuple( &mutex, &videosink, &com_pkgs, &loop_flag, loop );
+		vs_params c_params = boost::make_tuple( &mutex, &videosink, &com_pkgs, &loop_flag, loop, &active_conn );
 
 		{
 			gstbus_pt pipe_bus(	gst_pipeline_get_bus( GST_PIPELINE( videosink.root_bin.get() ) )
@@ -196,7 +197,7 @@ main( int argc, char* argv[] )
 
 		auto watch_cfg = boost::bind( watch_loop, &videosink, &loop_flag, &com_pkgs, &mutex
 			, opts_map["execution.watchdog-awareness"].as<int>(), &hr_time
-			, opts_map["execution.hard-reset"].as<int>() );
+			, opts_map["execution.hard-reset"].as<int>(), &active_conn );
 
 		boost::thread watch_thread( watch_cfg );
 

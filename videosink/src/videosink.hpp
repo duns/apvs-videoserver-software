@@ -38,7 +38,7 @@ namespace video_sink
  	 * @ingroup video_sink
 	 * @brief Type of pipeline's callback parameters.
 	 */
-	typedef boost::tuple<boost::mutex*, videosink_pipeline*, int*, bool*, GMainLoop*> vs_params;
+	typedef boost::tuple<boost::mutex*, videosink_pipeline*, int*, bool*, GMainLoop*, bool*> vs_params;
 
 	/**
  	 * @ingroup video_sink
@@ -154,6 +154,11 @@ namespace video_sink
 					g_main_loop_quit( m_data->get<4>() );
 				}
 			}
+			else if( !strcmp( msg->src->name, "demux" ) )
+			{
+				LOG_CLOG( log_debug_1 ) << "Setting active connection flag (negotiation packets received)...";
+				*m_data->get<5>() = true;
+			}
 		}
 		break;
 		default:
@@ -185,12 +190,16 @@ namespace video_sink
 	 */
 	static void
 	watch_loop( videosink_pipeline* pipeline, bool* loop_flag, int* com_pkgs, boost::mutex* mutex
-			, int qos_milli_time, int* hr_time, int hr_limit )
+			, int qos_milli_time, int* hr_time, int hr_limit, bool* active_conn )
 	{
+		boost::this_thread::sleep( boost::posix_time::milliseconds( qos_milli_time ) );
+
 		while( true )
 		{
 			boost::this_thread::sleep( boost::posix_time::milliseconds( qos_milli_time ) );
 			boost::lock_guard<boost::mutex> lock( *mutex );
+
+			bool switch_pads = false;
 
 			LOG_CLOG( log_debug_2 ) << "Watchdog loop: packets received in " << qos_milli_time
 				<< " milliseconds = " << *com_pkgs;
@@ -200,9 +209,24 @@ namespace video_sink
 			if( !*com_pkgs && *loop_flag )
 			{
 				LOG_CLOG( log_info ) << "No incoming packets, switching pads...";
+				*loop_flag = *active_conn = false;
+				switch_pads = true;
+			}
 
-				*loop_flag = false;
+			if( !*com_pkgs && *active_conn )
+			{
+				LOG_CLOG( log_info ) << "Erroneous video sink state, switching pads...";
+				*active_conn = false;	
+				switch_pads = true;
+			}
 
+			if( *com_pkgs )
+			{
+				*hr_time = 0;
+			}
+
+			if( switch_pads )
+			{
 				g_object_set( G_OBJECT( pipeline->elements["iselector"] )
 					, "active-pad", pipeline->pads["sel_sink1"]
 					, NULL );
@@ -214,12 +238,7 @@ namespace video_sink
 				gst_element_set_state( GST_ELEMENT( pipeline->root_bin.get() ), GST_STATE_READY );
 				gst_element_set_state( GST_ELEMENT( pipeline->root_bin.get() ), GST_STATE_PLAYING );
 			}
-
-			if( *com_pkgs )
-			{
-				*hr_time = 0;
-			}
-
+			
 			*com_pkgs = 0;
 
 			if( *hr_time > hr_limit )
