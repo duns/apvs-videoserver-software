@@ -29,6 +29,9 @@
 #include "videostreamer_common.hpp"
 #include "videosink_pipeline.hpp"
 
+#define WATCHDOG_INIT_SLEEP 3000
+#define SIGTERM_RETRIES 4
+
 namespace video_sink
 {
 	using namespace auxiliary_libraries;
@@ -171,12 +174,12 @@ namespace video_sink
 
 	/**
  	 * @ingroup video_sink
-	 * @brief Watch-dog thread loop 
+	 * @brief Level 1 watch-dog thread loop
 	 *
-	 * The watch-dog thread periodically tests the loop flag along with the number of data packets 
+	 * The level 1 watch-dog thread periodically tests the loop flag along with the number of data packets
 	 * received in the time space between current and last check, in order to determine whether the 
 	 * connection is lost  or its quality has been dramatically deteriorated. If one of the previous 
-	 * mentioned conditions is true it switches from the network stream to a dummy one and resets the
+	 * mentioned conditions is true, it switches from the network stream to a dummy one and resets the
 	 * pipeline to defaults.
 	 *
 	 * @sa <a href="gstreamer.freedesktop.org/data/doc/gstreamer/head/gstreamer-plugins/html/gstreamer
@@ -185,45 +188,52 @@ namespace video_sink
 	 * @param pipeline a pointer to the video streaming pipeline
 	 * @param loop_flag a pointer to a loop flag provided by the executing pipeline
 	 * @param com_pkgs a pointer to the number of packets received between current and last check
-	 * @param mutex a pointer to a mutex provided by the executing pipeline
+	 * @param l1_mutex a pointer to the level 1 mutex provided by the executing pipeline
 	 * @param qos_milli_time sleeping time of each iteration in milliseconds
+	 * @param l1_guard level 1 boolean guard flag to set to false by running process
+	 * @param l2_mutex a pointer to the level 2 mutex provided by the mother process for mutating the guard
 	 */
 	static void
-	watch_loop( videosink_pipeline* pipeline, bool* loop_flag, int* com_pkgs, boost::mutex* mutex
-			, int qos_milli_time, int* hr_time, int hr_limit, bool* active_conn )
+	l1_watch_loop( videosink_pipeline* pipeline, bool* loop_flag, int* com_pkgs, boost::mutex* l1_mutex
+			, int qos_milli_time, int hr_limit, bool* active_conn, bool* l1_guard
+			, boost::mutex* l2_mutex )
 	{
-		boost::this_thread::sleep( boost::posix_time::milliseconds( qos_milli_time ) );
+		boost::this_thread::sleep( boost::posix_time::milliseconds( WATCHDOG_INIT_SLEEP ) );
+		int hr_time = 0;
 
 		while( true )
 		{
+			{
+				boost::lock_guard<boost::mutex> lock( *l2_mutex );
+				*l1_guard = false;
+			}
+
 			boost::this_thread::sleep( boost::posix_time::milliseconds( qos_milli_time ) );
-			boost::lock_guard<boost::mutex> lock( *mutex );
+			boost::lock_guard<boost::mutex> lock( *l1_mutex );
 
 			bool switch_pads = false;
 
-			LOG_CLOG( log_debug_2 ) << "Watchdog loop: packets received in " << qos_milli_time
+			LOG_CLOG( log_debug_2 ) << "L1 watchdog: packets received in " << qos_milli_time
 				<< " milliseconds = " << *com_pkgs;
 
-			*hr_time += qos_milli_time;
+			hr_time += qos_milli_time;
 
 			if( !*com_pkgs && *loop_flag )
 			{
-				LOG_CLOG( log_info ) << "No incoming packets, switching pads...";
+				LOG_CLOG( log_info ) << "L1 watchdog: No incoming packets, switching pads...";
 				*loop_flag = *active_conn = false;
 				switch_pads = true;
 			}
 
 			if( !*com_pkgs && *active_conn )
 			{
-				LOG_CLOG( log_info ) << "Erroneous video sink state, switching pads...";
+				LOG_CLOG( log_info ) << "L1 watchdog: Erroneous video sink state, switching pads...";
 				*active_conn = false;	
 				switch_pads = true;
 			}
 
 			if( *com_pkgs )
-			{
-				*hr_time = 0;
-			}
+				hr_time = 0;
 
 			if( switch_pads )
 			{
@@ -241,9 +251,9 @@ namespace video_sink
 			
 			*com_pkgs = 0;
 
-			if( *hr_time > hr_limit )
+			if( hr_time > hr_limit )
 			{
-				LOG_CLOG( log_info ) << "Hard reset time limit reached, signaling destruction...";
+				LOG_CLOG( log_info ) << "L1 watchdog: Hard reset time limit reached, signaling destruction...";
 
 				GstBus* bus = gst_pipeline_get_bus( GST_PIPELINE( pipeline->root_bin.get() ) );
 				GstMessage* msg_switch = gst_message_new_custom(
@@ -251,7 +261,53 @@ namespace video_sink
 				  , gst_structure_new( "hard_reset", "p", G_TYPE_STRING, "p", NULL ) );
 				gst_bus_post( bus, msg_switch );
 				gst_object_unref( GST_OBJECT( bus ) );
+
+				break;
 			}
+		}
+	}
+
+	/**
+	 * @ingroup video_source
+	 * @brief Level 2 watch-dog thread loop
+	 *
+	 * The level 2 watch-dog thread periodically tests whether watch-dog level 1 is running properly. It ensures
+	 * that in case a process that locks level 1 mutex hangs (due to some underlying Gstreamer library calls not
+	 * returning), a proper termination signal will be send to the mother process.
+	 *
+	 * @param l1_guard pointer to level 1 guard, if the guard found to be set in two subsequent test then
+	 * something went wrong
+	 * @param l2_mutex pointer to level 2 mutex provided by the mother process for mutating the guard
+	 * @param qos_milli_time level 1 watch-dog sleeping time across iterations
+	 */
+	static void
+	l2_watch_loop( bool* l1_guard, boost::mutex* l2_mutex, int qos_milli_time )
+	{
+		boost::this_thread::sleep( boost::posix_time::milliseconds( WATCHDOG_INIT_SLEEP ) );
+		int sig_counter = 0;
+
+		while( true )
+		{
+			boost::this_thread::sleep( boost::posix_time::milliseconds( qos_milli_time * 5 ) );
+			boost::lock_guard<boost::mutex> lock( *l2_mutex );
+
+			if( *l1_guard )
+			{
+				if( sig_counter < SIGTERM_RETRIES )
+				{
+					LOG_CLOG( log_info ) << "L2 watchdog: Sending SIGTERM to " << getpid() << " ...";
+					kill( getpid(), SIGTERM );
+				}
+				else
+				{
+					LOG_CLOG( log_info ) << "L2 watchdog: Sending SIGKILL to " << getpid() << " ...";
+					kill( getpid(), SIGKILL );
+				}
+
+				sig_counter++;
+			}
+
+			*l1_guard = true;
 		}
 	}
 }

@@ -43,13 +43,14 @@ main( int argc, char* argv[] )
 {
 	GMainLoop* loop = g_main_loop_new( NULL, false );
 
-	boost::mutex mutex;
+	boost::mutex l1_mutex
+		, l2_mutex;
 
-	int com_pkgs = 0
-	  , hr_time = 0;
+	int com_pkgs = 0;
 
 	bool loop_flag = false
-	   , active_conn = false;
+	   , active_conn = false
+	   , l1_guard = false;
 
 	if( !loop )
 	{
@@ -167,6 +168,13 @@ main( int argc, char* argv[] )
 		global_log_level = static_cast<auxiliary_libraries::log_level>(
 			opts_map["execution.messages-detail"].as<int>() );
 
+		LOG_CLOG( log_info ) << "Initializing level 2 watchdog...";
+
+		auto l2_watch_cfg = boost::bind( l2_watch_loop, &l1_guard, &l2_mutex
+				, opts_map["execution.watchdog-awareness"].as<int>() );
+
+		boost::thread l2_watch_thread( l2_watch_cfg );
+
 		LOG_CLOG( log_info ) << "Initializing Gstreamer...";
 
 		gst_init( &argc, &argv );
@@ -181,7 +189,7 @@ main( int argc, char* argv[] )
 
 		LOG_CLOG( log_info ) << "Registering callbacks...";
 
-		vs_params c_params = boost::make_tuple( &mutex, &videosink, &com_pkgs, &loop_flag, loop, &active_conn );
+		vs_params c_params = boost::make_tuple( &l1_mutex, &videosink, &com_pkgs, &loop_flag, loop, &active_conn );
 
 		{
 			gstbus_pt pipe_bus(	gst_pipeline_get_bus( GST_PIPELINE( videosink.root_bin.get() ) )
@@ -195,11 +203,11 @@ main( int argc, char* argv[] )
 
 		LOG_CLOG( log_info ) << "Initializing watchdog...";
 
-		auto watch_cfg = boost::bind( watch_loop, &videosink, &loop_flag, &com_pkgs, &mutex
-			, opts_map["execution.watchdog-awareness"].as<int>(), &hr_time
-			, opts_map["execution.hard-reset"].as<int>(), &active_conn );
+		auto l1_watch_cfg = boost::bind( l1_watch_loop, &videosink, &loop_flag, &com_pkgs, &l1_mutex
+			, opts_map["execution.watchdog-awareness"].as<int>(), opts_map["execution.hard-reset"].as<int>()
+			, &active_conn, &l1_guard, &l2_mutex );
 
-		boost::thread watch_thread( watch_cfg );
+		boost::thread l1_watch_thread( l1_watch_cfg );
 
 		LOG_CLOG( log_info ) << "Starting pipeline...";
 
