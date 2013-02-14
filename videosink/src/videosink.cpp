@@ -54,7 +54,7 @@ main( int argc, char* argv[] )
 
 	if( !loop )
 	{
-		LOG_CLOG( log_error ) << "Cannot initiate program loop.";
+		LOG_CERR( log_error ) << "Cannot initiate program loop.";
 		return EXIT_FAILURE;
 	}
 
@@ -91,13 +91,13 @@ main( int argc, char* argv[] )
 
 		if( opts_map["config-path"].empty() )
 		{
-			LOG_CLOG( log_error ) << "You must supply a path for the configuration file.";
+			LOG_CERR( log_error ) << "You must supply a path for the configuration file.";
 			return EXIT_FAILURE;
 		}
 
 		if( opts_map["session-id"].empty() )
 		{
-			LOG_CLOG( log_error ) << "You must supply a valid session identifier.";
+			LOG_CERR( log_error ) << "You must supply a valid session identifier.";
 			return EXIT_FAILURE;
 		}
 
@@ -127,7 +127,8 @@ main( int argc, char* argv[] )
 			( "timeoverlay.halignment"         , app_opts::value<int>()        , "" )
 			( "timeoverlay.font"               , app_opts::value<std::string>(), "" )
 			( "execution.messages-detail"      , app_opts::value<int>()        , "" )
-			( "execution.watchdog-awareness"   , app_opts::value<int>()        , "" )
+			( "execution.l1-watchdog-awareness", app_opts::value<int>()        , "" )
+			( "execution.l2-watchdog-awareness", app_opts::value<int>()        , "" )
 			( "execution.hard-reset"           , app_opts::value<int>()        , "" )
 		;
 
@@ -135,7 +136,7 @@ main( int argc, char* argv[] )
 
 		if( !config_file )
 		{
-			LOG_CLOG( log_error ) << "Configuration file not found. Exiting...";
+			LOG_CERR( log_error ) << "Configuration file not found. Exiting...";
 			return EXIT_FAILURE;
 		}
 
@@ -154,14 +155,14 @@ main( int argc, char* argv[] )
 					auto cur_opt = arg.get()->format_name().substr(2, arg.get()->format_name().length() - 2);
 					if( opts_map[cur_opt].empty() )
 					{
-						LOG_CLOG( log_error ) << "Parameter '" << cur_opt << "' is not properly set.";
+						LOG_CERR( log_error ) << "Parameter '" << cur_opt << "' is not properly set.";
 						param_flag = false;
 					}
 				} );
 
 		if( !param_flag )
 		{
-			LOG_CLOG( log_error ) << "Invalid configuration. Exiting...";
+			LOG_CERR( log_error ) << "Invalid configuration. Exiting...";
 			return EXIT_FAILURE;
 		}
 
@@ -171,7 +172,7 @@ main( int argc, char* argv[] )
 		LOG_CLOG( log_info ) << "Initializing level 2 watchdog...";
 
 		auto l2_watch_cfg = boost::bind( l2_watch_loop, &l1_guard, &l2_mutex
-				, opts_map["execution.watchdog-awareness"].as<int>() );
+				, opts_map["execution.l2-watchdog-awareness"].as<int>() );
 
 		boost::thread l2_watch_thread( l2_watch_cfg );
 
@@ -204,7 +205,7 @@ main( int argc, char* argv[] )
 		LOG_CLOG( log_info ) << "Initializing watchdog...";
 
 		auto l1_watch_cfg = boost::bind( l1_watch_loop, &videosink, &loop_flag, &com_pkgs, &l1_mutex
-			, opts_map["execution.watchdog-awareness"].as<int>(), opts_map["execution.hard-reset"].as<int>()
+			, opts_map["execution.l1-watchdog-awareness"].as<int>(), opts_map["execution.hard-reset"].as<int>()
 			, &active_conn, &l1_guard, &l2_mutex );
 
 		boost::thread l1_watch_thread( l1_watch_cfg );
@@ -222,7 +223,7 @@ main( int argc, char* argv[] )
 	catch( const boost::exception& e )
 	{
 		LOG_CLOG( log_debug_1 ) << boost::diagnostic_information( e );
-		LOG_CLOG( log_error ) << "Fatal error occurred. Exiting...";
+		LOG_CERR( log_error ) << "Fatal error occurred. Exiting...";
 
 		g_main_loop_quit( loop );
 
