@@ -123,14 +123,14 @@ namespace video_streamer
 
 		if( !elements[name] )
 		{
-			LOG_CLOG( log_error ) << "Cannot create element '" << name << "' of type {" << element << "}.";
+			LOG_CERR( log_error ) << "Cannot create element '" << name << "' of type {" << element << "}.";
 			BOOST_THROW_EXCEPTION( api_error() << api_info( "Failed to create element." ) );
 		}
 		else
 		{
 			if( !gst_bin_add( bin.get(), elements[name] ) )
 			{
-				LOG_CLOG( log_error ) << "Cannot add element '" << name << "' of type {"
+				LOG_CERR( log_error ) << "Cannot add element '" << name << "' of type {"
 					<< element << "} to pipeline.";
 				BOOST_THROW_EXCEPTION( api_error() << api_info( "Failed to add element to pipeline." ) );
 			}

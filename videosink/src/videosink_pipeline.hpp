@@ -67,7 +67,7 @@ namespace video_sink
 
 		if( !link_flag )
 		{
-			LOG_CLOG( log_error ) << "Filter linking error.";
+			LOG_CERR( log_error ) << "Filter linking error.";
 			BOOST_THROW_EXCEPTION( api_error() << api_info( "Couldn't connect to filter." ) );
 		}
 	}
@@ -88,13 +88,13 @@ namespace video_sink
 
 		if( ! ( caps = gst_pad_get_caps( pad ) ) )
 		{
-			LOG_CLOG( log_error ) << "Failed to get caps.";
+			LOG_CERR( log_error ) << "Failed to get caps.";
 			BOOST_THROW_EXCEPTION( api_error() << api_info( "Caps Error." ) );
 		}
 
 		if( ! ( caps_struct = gst_caps_get_structure( caps, 0 ) ) )
 		{
-			LOG_CLOG( log_error ) << "Failed to retrieve caps structure.";
+			LOG_CERR( log_error ) << "Failed to retrieve caps structure.";
 			BOOST_THROW_EXCEPTION( api_error() << api_info( "Caps Error." ) );
 		}
 
@@ -108,7 +108,7 @@ namespace video_sink
 
 			if( !pipeline )
 			{
-				LOG_CLOG( log_error ) << "Couldn't obtain parent bin.";
+				LOG_CERR( log_error ) << "Couldn't obtain parent bin.";
 				BOOST_THROW_EXCEPTION( api_error() << api_info( "Parent retrieval error." ) );
 			}
 
@@ -116,7 +116,7 @@ namespace video_sink
 
 			if( !h264dec )
 			{
-				LOG_CLOG( log_error ) << "Couldn't obtain decoder element from pipeline.";
+				LOG_CERR( log_error ) << "Couldn't obtain decoder element from pipeline.";
 				BOOST_THROW_EXCEPTION( api_error() << api_info( "Pipeline component retrieval error." ) );
 			}
 
@@ -124,7 +124,7 @@ namespace video_sink
 
             		if( !targetsink )
             		{
-              			LOG_CLOG( log_error ) << "Failed to retrieve decoder pad.";
+              			LOG_CERR( log_error ) << "Failed to retrieve decoder pad.";
 		              	BOOST_THROW_EXCEPTION( api_error() << api_info( "Pad retrieving error." ) );
 			}
 
@@ -147,7 +147,7 @@ namespace video_sink
 		}
 		else
 		{
-			LOG_CLOG( log_error ) << "Failed to obtain source pad.";
+			LOG_CERR( log_error ) << "Failed to obtain source pad.";
 			BOOST_THROW_EXCEPTION( api_error() << api_info( "Pad retrieving error." ) );
 		}
 
@@ -203,7 +203,7 @@ namespace video_sink
 			if( !gst_element_link_many( elements["networksource"], elements["tee"], NULL )
 			||  !gst_element_link( elements["queue1"], elements["demux"] ) )
 			{
-				LOG_CLOG( log_error ) << "Failed to link elements.";
+				LOG_CERR( log_error ) << "Failed to link elements.";
 				BOOST_THROW_EXCEPTION( api_error() << api_info( "Linking failure." ) );
 			}
 
@@ -224,7 +224,7 @@ namespace video_sink
                         , elements["clockoverlay"], elements["coglogoinsert"], elements["iselector"]
                         , elements["v4l2sink"], NULL ) )
 				{
-					LOG_CLOG( log_error ) << "Failed to link elements.";
+					LOG_CERR( log_error ) << "Failed to link elements.";
 					BOOST_THROW_EXCEPTION( api_error() << api_info( "Linking failure." ) );
 				}
 			}
@@ -234,7 +234,7 @@ namespace video_sink
                         , elements["ffmpegcs0"], elements["videorate"], elements["queue2"], elements["timeoverlay"]
                         , elements["coglogoinsert"], elements["iselector"], elements["v4l2sink"], NULL ) )
 				{
-					LOG_CLOG( log_error ) << "Failed to link elements.";
+					LOG_CERR( log_error ) << "Failed to link elements.";
 					BOOST_THROW_EXCEPTION( api_error() << api_info( "Linking failure." ) );
 				}
 			}
@@ -293,7 +293,7 @@ namespace video_sink
 
 			if( !pads["sel_sink0"] || !pads["sel_sink1"])
 			{
-				LOG_CLOG( log_error ) << "Failed to retrieve input-selector pads.";
+				LOG_CERR( log_error ) << "Failed to retrieve input-selector pads.";
 				BOOST_THROW_EXCEPTION( api_error() << api_info( "Pad retrieving error." ) );
 			}
 
@@ -308,7 +308,7 @@ namespace video_sink
 
 			if( !tee_src0 || !tee_src1 || !queue0_sink || !queue0_src || !queue1_sink || !filesink_sink )
 			{
-				LOG_CLOG( log_error ) << "Failed to retrieve element pads.";
+				LOG_CERR( log_error ) << "Failed to retrieve element pads.";
 				BOOST_THROW_EXCEPTION( api_error() << api_info( "Pad retrieving error." ) );
 			}
 
@@ -316,7 +316,7 @@ namespace video_sink
 			 || gst_pad_link( tee_src1, queue1_sink ) != GST_PAD_LINK_OK
 			 || gst_pad_link( queue0_src, filesink_sink ) != GST_PAD_LINK_OK )
 			{
-				LOG_CLOG( log_error ) << "Failed to link pads.";
+				LOG_CERR( log_error ) << "Failed to link pads.";
 				BOOST_THROW_EXCEPTION( api_error() << api_info( "Pad linking error." ) );
 			}
 

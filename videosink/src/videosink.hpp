@@ -24,6 +24,8 @@
 #include <gstreamermm.h>
 #include <boost/tuple/tuple.hpp>
 #include <boost/thread.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
 
 #include "log.hpp"
 #include "videostreamer_common.hpp"
@@ -64,6 +66,12 @@ namespace video_sink
 
 		boost::lock_guard<boost::mutex> lock( *m_data->get<0>() );
 
+		using boost::gregorian::date;
+		using boost::posix_time::ptime;
+		using boost::posix_time::microsec_clock;
+
+		static ptime const base_time( date( 2013, 1, 1 ) );
+
 		if( !*m_data->get<3>() )
 		{
 			LOG_CLOG( log_info ) << "Network activity observed...";
@@ -73,6 +81,8 @@ namespace video_sink
 			  , gst_structure_new( "switch_stream", "p", G_TYPE_STRING, "p", NULL ) );
 			gst_bus_post( bus, msg_switch );
 			gst_object_unref( GST_OBJECT( bus ) );
+			LOG_CERR( log_info ) << "**STARTED AT**: "
+				<< ( microsec_clock::local_time() - base_time ).total_milliseconds();
 		}
 
 		*m_data->get<2>()+= 1;
@@ -118,7 +128,7 @@ namespace video_sink
 			g_error_free( err );
 			g_free( err_str );
 
-			LOG_CLOG( log_error ) << "'" << msg->src->name << "' threw a: " << GST_MESSAGE_TYPE_NAME( msg );
+			LOG_CERR( log_error ) << "'" << msg->src->name << "' threw a: " << GST_MESSAGE_TYPE_NAME( msg );
 			gst_element_set_state( GST_ELEMENT( m_data->get<1>()->root_bin.get() ), GST_STATE_NULL );
 			BOOST_THROW_EXCEPTION( bus_error() << bus_info( err_msg ) );
 		}
@@ -189,17 +199,23 @@ namespace video_sink
 	 * @param loop_flag a pointer to a loop flag provided by the executing pipeline
 	 * @param com_pkgs a pointer to the number of packets received between current and last check
 	 * @param l1_mutex a pointer to the level 1 mutex provided by the executing pipeline
-	 * @param qos_milli_time sleeping time of each iteration in milliseconds
+	 * @param sleep_milli_time sleeping time of each iteration in milliseconds
 	 * @param l1_guard level 1 boolean guard flag to set to false by running process
 	 * @param l2_mutex a pointer to the level 2 mutex provided by the mother process for mutating the guard
 	 */
 	static void
 	l1_watch_loop( videosink_pipeline* pipeline, bool* loop_flag, int* com_pkgs, boost::mutex* l1_mutex
-			, int qos_milli_time, int hr_limit, bool* active_conn, bool* l1_guard
+			, int sleep_milli_time, int hr_limit, bool* active_conn, bool* l1_guard
 			, boost::mutex* l2_mutex )
 	{
 		boost::this_thread::sleep( boost::posix_time::milliseconds( WATCHDOG_INIT_SLEEP ) );
 		int hr_time = 0;
+
+		using boost::gregorian::date;
+		using boost::posix_time::ptime;
+		using boost::posix_time::microsec_clock;
+
+		static ptime const base_time( date( 2013, 1, 1 ) );
 
 		while( true )
 		{
@@ -208,15 +224,15 @@ namespace video_sink
 				*l1_guard = false;
 			}
 
-			boost::this_thread::sleep( boost::posix_time::milliseconds( qos_milli_time ) );
+			boost::this_thread::sleep( boost::posix_time::milliseconds( sleep_milli_time ) );
 			boost::lock_guard<boost::mutex> lock( *l1_mutex );
 
 			bool switch_pads = false;
 
-			LOG_CLOG( log_debug_2 ) << "L1 watchdog: packets received in " << qos_milli_time
+			LOG_CLOG( log_debug_2 ) << "L1 watchdog: packets received in " << sleep_milli_time
 				<< " milliseconds = " << *com_pkgs;
 
-			hr_time += qos_milli_time;
+			hr_time += sleep_milli_time;
 
 			if( !*com_pkgs && *loop_flag )
 			{
@@ -244,7 +260,10 @@ namespace video_sink
 				if( global_log_level > log_debug_0 )
 					GST_DEBUG_BIN_TO_DOT_FILE( pipeline->root_bin.get()
 							, GST_DEBUG_GRAPH_SHOW_NON_DEFAULT_PARAMS, "local-flow" );
-					
+
+				LOG_CERR( log_info ) << "**STOPPED AT**: "
+					<< ( microsec_clock::local_time() - base_time ).total_milliseconds();
+
 				gst_element_set_state( GST_ELEMENT( pipeline->root_bin.get() ), GST_STATE_READY );
 				gst_element_set_state( GST_ELEMENT( pipeline->root_bin.get() ), GST_STATE_PLAYING );
 			}
@@ -278,17 +297,17 @@ namespace video_sink
 	 * @param l1_guard pointer to level 1 guard, if the guard found to be set in two subsequent test then
 	 * something went wrong
 	 * @param l2_mutex pointer to level 2 mutex provided by the mother process for mutating the guard
-	 * @param qos_milli_time level 1 watch-dog sleeping time across iterations
+	 * @param sleep_milli_time sleeping time across iterations
 	 */
 	static void
-	l2_watch_loop( bool* l1_guard, boost::mutex* l2_mutex, int qos_milli_time )
+	l2_watch_loop( bool* l1_guard, boost::mutex* l2_mutex, int sleep_milli_time )
 	{
 		boost::this_thread::sleep( boost::posix_time::milliseconds( WATCHDOG_INIT_SLEEP ) );
 		int sig_counter = 0;
 
 		while( true )
 		{
-			boost::this_thread::sleep( boost::posix_time::milliseconds( qos_milli_time * 5 ) );
+			boost::this_thread::sleep( boost::posix_time::milliseconds( sleep_milli_time ) );
 			boost::lock_guard<boost::mutex> lock( *l2_mutex );
 
 			if( *l1_guard )
