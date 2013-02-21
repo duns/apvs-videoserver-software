@@ -13,6 +13,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/program_options.hpp>
+#include <boost/range.hpp>
 
 #include <stdlib.h>
 
@@ -71,13 +72,25 @@ int main( int argc, char* argv[] )
 			tcp::socket socket( io_service );
 			boost::system::error_code err_code;
 			acceptor.accept( socket, err_code );
+			int bytes_received;
 
+			try
+			{
 			if ( !err_code )
 			{
 				std::stringstream bufstream;
 
-				socket.receive( boost::asio::buffer( msg_buf ) );
-				bufstream << "{\"root\":" << msg_buf.data() << "\n}\0";
+
+				bytes_received=socket.receive( boost::asio::buffer( msg_buf ) );
+				int astart=0,aend=bytes_received;
+				for(;astart<bytes_received;astart++)
+					if(msg_buf[astart]=='{')
+						break;
+				for(;aend>=astart;aend--)
+					if(msg_buf[aend]=='}')
+						break;
+				boost::iterator_range<char*> subarray(&msg_buf[astart], &msg_buf[aend+1]);
+				bufstream << "{\"root\":" << subarray << "\n}\0";
 
 				LOG_CLOG( log_debug_0 ) << "Message send from client:\n" << bufstream.str();
 
@@ -88,28 +101,52 @@ int main( int argc, char* argv[] )
 				std::string sender = pt.get<std::string>("root.Sender")
     				, command = mt.second.get<std::string>("Type").compare( "StartRecording" )?"stop":"start"
     				, mac_address = mt.second.get<std::string>("MacAddress")
-    				, file_name = mt.second.get<std::string>("FileName");
+    				, file_name = mt.second.get<std::string>("FileName")
+    				, hostname = mt.second.get<std::string>("HostName");
 
     			LOG_CLOG( log_debug_0 ) << "Parameters identified:\n"
     									<< "Sender : " << sender
     									<< "\nCommand Type : " << command
     									<< "\nMAC Address : " << mac_address
+    									<< "\nHost name : " <<  hostname
     									<< "\nFile name : " << file_name;
 
     			msg_buf.fill(0);
 
     			std::stringstream shellstream;
-
     			shellstream << opts_map["server-script"].as<std::string>()
-    						<< " " <<  command <<  " "
-    						<< mac_address << " "
-    						<< file_name;
+    						<< " " <<  command << " ";
+			if(mac_address.length()!=0)
+				shellstream << mac_address;
+			else
+				if(hostname.length()!=0)
+					shellstream << hostname;
+				else
+				{
+					LOG_CLOG( log_error ) << "Invalid message. Ignoring...";
+					continue;
+				}
+						
 
-    			LOG_CLOG( log_debug_0 ) << shellstream.str();
 
-    			system( shellstream.str().c_str() );
+			if(command.length()!=0&&file_name.length()!=0)
+			{
+				shellstream << " " << file_name;
+    				LOG_CLOG( log_debug_0 ) << shellstream.str();
+    				system( shellstream.str().c_str() );
+			}
+			else
+				LOG_CLOG( log_error ) << "Invalid message. Ignoring...";
+			}
+
+			}
+			catch( const boost::exception& e )
+			{
+				LOG_CLOG( log_debug_1 ) << boost::diagnostic_information( e );
+				LOG_CLOG( log_error ) << "Invalid message. Ignoring...";
 			}
 		}
+
 	}
 	catch( const boost::exception& e )
 	{
