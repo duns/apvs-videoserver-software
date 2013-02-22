@@ -176,13 +176,28 @@ namespace video_sink
 			: root_bin( GST_BIN( gst_pipeline_new( "videosink" ) ), cust_deleter<GstBin>() )
 		{
 
-			create_add_element( root_bin, elements, "tcpserversrc", "networksource" );
+			if( !opts_map["connection.transfer-protocol"].as<std::string>().compare( std::string("TCP") ) )
+			{
+				create_add_element( root_bin, elements, "tcpserversrc", "networksource" );
 
-			g_object_set( G_OBJECT( elements["networksource"] )
-				, "host", opts_map["connection.localhost"].as<std::string>().c_str()
-				, "port", opts_map["connection.port"].as<int>()
-				, "do-timestamp", true
-				, NULL );
+				g_object_set( G_OBJECT( elements["networksource"] )
+					, "host", opts_map["connection.localhost"].as<std::string>().c_str()
+					, "port", opts_map["connection.port"].as<int>()
+					, "do-timestamp", true
+					, NULL );
+			}
+			else if( !opts_map["connection.transfer-protocol"].as<std::string>().compare( std::string("UDP") ) )
+			{
+				create_add_element( root_bin, elements, "udpsrc", "networksource" );
+
+				GstStaticCaps src_caps =
+						GST_STATIC_CAPS( "video/mpegts,systemstream=(boolean)true,packetsize=(int)188" );
+
+				g_object_set( G_OBJECT( elements["networksource"] )
+					, "port", opts_map["connection.port"].as<int>()
+					, "caps", src_caps.caps
+					, NULL );
+			}
 
 			create_add_element( root_bin, elements, "queue2", "queue0" );
 			create_add_element( root_bin, elements, "queue2", "queue1" );
