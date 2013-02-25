@@ -1,4 +1,5 @@
 [connection]
+transfer-protocol=TCP
 localhost=137.138.61.145
 port=5000
 [localvideosource]
