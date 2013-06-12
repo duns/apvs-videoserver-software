@@ -19,27 +19,37 @@
 umask 0000
 PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 DESC="videoserver service (single instance)"
-DAEMON=/usr/local/videoserver/videoserver_testing.sh
-#DAEMON=/usr/local/videoserver/workerserver.sh
+DAEMON=/usr/src/server-software/videosink/scripts/videoserver.sh
 #DAEMON_ARGS="--options args"
-PTU_MAC=${2}
+CONFFILE=/etc/videostream.conf.d/videoserver.conf
+PTU_ID=${2}
 SESSION_ID="t0${PTU_MAC}"
 [ -n "$3" ] && SESSION_ID=${3}
-NAME=videoserver-${PTU_MAC}
-LOGFILENAME="/var/log/videoserver/"`date +"%y%m%d"`.${PTU_MAC}.log
-DAEMON_ARGS="10:00:00:00:00:00 0 t01 ${LOGFILENAME}"
+
+# Read configuration variable file if it is present
+if [ -r "$CONFFILE" ] ;then
+	PTU_HOSTNAME=`grep "$PTU_ID " "$CONFFILE" | awk '{print $1}' | head -1` 
+	PTU_MAC=`grep "$PTU_ID" "$CONFFILE" | awk '{print $2}' | head -1` 
+	SLOT=`grep "$PTU_ID" "$CONFFILE" | awk '{print $3}' | head -1` 
+#	echo $DAEMON_ARGS
+	if [ -z "$PTU_MAC" ];then
+		log_daemon_msg "PTU ID $PTU_MAC not found in configuration file $CONFFILE" && log_end_msg 1 
+		exit 1
+	fi
+	
+fi
+
+NAME=videoserver-${PTU_HOSTNAME}
+LOGFILENAME="/var/log/videoserver/"`date +"%y%m%d"`.${PTU_HOSTNAME}.log
+DAEMON_ARGS="$PTU_MAC $SLOT $SESSION_ID $LOGFILENAME"
 PIDFILE=/var/run/videoserver/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-USERID=chpap:chpap
 USERID=$USER:$USER
-CONFFILE=/etc/videostream.conf.d/videoserver.conf
+USERID=atwpss:atwpss
+USERID=wpsssupervisor:wpsssupervisor
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
-read_conf()
-{
-	grep " $2 " $1 | sed -e "s/^.*$2 //"
-}
 
 # Load the VERBOSE setting and other rcS variables
 . /lib/init/vars.sh
@@ -50,17 +60,6 @@ VERBOSE=yes
 # and status_of_proc is working.
 . /lib/lsb/init-functions
 
-# Read configuration variable file if it is present
-if [ -r "$CONFFILE" ] ;then
-	SLOT=`read_conf "$CONFFILE" "$PTU_MAC"` 
-#	echo $DAEMON_ARGS
-	if [ -z "$SLOT" ];then
-		log_daemon_msg "PTU ID $PTU_MAC not found in configuration file $CONFFILE" && log_end_msg 1 
-		exit 1
-	fi
-	
-	DAEMON_ARGS="$PTU_MAC $SLOT $SESSION_ID $LOGFILENAME"
-fi
 
 #
 # Function that starts the daemon/service
@@ -99,15 +98,15 @@ do_stop()
 	#   2 if daemon could not be stopped
 	#   other if a failure occurred
 	[ -f "$PIDFILE"  ] || return 1
-	PGID=`ps --no-heading -p $(cat $PIDFILE) -o "%r"| awk '{print $1}'`
-	echo $PGID
-	[ -z "$PGID"  ] || return 1
-	kill -INT -${PGID}
+##	PGID=`ps --no-heading -p $(cat $PIDFILE) -o "%r"| awk '{print $1}'`
+##	echo $PGID
+##	[ -z "$PGID"  ] && return 1
+##	kill -INT -${PGID}
 #	sleep 5
 #	kill -KILL -${PGID}
-	RETVAL=0
-#	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
-#	RETVAL="$?"
+##	RETVAL=0
+	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE 
+	RETVAL="$?"
 #	[ "$RETVAL" = 2 ] && return 2
 	# Wait for children to finish too if this is a daemon that forks
 	# and if the daemon is only ever run from this initscript.
