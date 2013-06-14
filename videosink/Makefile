@@ -13,6 +13,7 @@ LIBS       = -lgstreamer-0.10 \
 	     -lboost_thread \
 	     -lboost_filesystem \
 	     -lboost_system \
+	     -lgobject-2.0 \
 	     -lglib-2.0
 
 EXTRA_DIST = doxygen.conf
