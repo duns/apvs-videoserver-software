@@ -49,6 +49,7 @@ int main( int argc, char* argv[] )
 			  , app_opts::value<std::string>()->default_value( std::string( "/etc/init.d/videoserver_single" ) )
 			  , "" )
 			( "verbosity", app_opts::value<int>()->default_value( 0 ), "Program messages detail." )
+			( "start-stop-default-stream", "Stop and start default streams." )
 			;
 
 		app_opts::store( app_opts::parse_command_line( argc, argv, desc ), opts_map );
@@ -103,24 +104,37 @@ int main( int argc, char* argv[] )
     				, mac_address = mt.second.get<std::string>("MacAddress")
     				, file_name = mt.second.get<std::string>("FileName")
     				, hostname = mt.second.get<std::string>("HostName");
+			size_t pos = file_name.find('_');
 
+			std::string dirname=file_name.substr(0,pos);
     			LOG_CLOG( log_debug_0 ) << "Parameters identified:\n"
     									<< "Sender : " << sender
     									<< "\nCommand Type : " << command
     									<< "\nMAC Address : " << mac_address
     									<< "\nHost name : " <<  hostname
-    									<< "\nFile name : " << file_name;
+    									<< "\nFile name : " << file_name
+    									<< "\nDirectory name : " << dirname;
 
     			msg_buf.fill(0);
 
     			std::stringstream shellstream;
+    			std::stringstream shellstream2;
     			shellstream << opts_map["server-script"].as<std::string>()
     						<< " " <<  command << " ";
+    			shellstream2 << opts_map["server-script"].as<std::string>()
+    						<< " " <<  std::string(command.compare("start")?"start":"stop") << " ";
+
 			if(mac_address.length()!=0)
+			{
 				shellstream << mac_address;
+				shellstream2 << mac_address;
+			}
 			else
 				if(hostname.length()!=0)
+				{
 					shellstream << hostname;
+					shellstream2 << hostname;
+				}
 				else
 				{
 					LOG_CLOG( log_error ) << "Invalid message. Ignoring...";
@@ -129,11 +143,28 @@ int main( int argc, char* argv[] )
 						
 
 
-			if(command.length()!=0&&file_name.length()!=0)
+			if(command.length()!=0&&((command.compare("start"))||dirname.length()!=0))
 			{
-				shellstream << " " << file_name;
-    				LOG_CLOG( log_debug_0 ) << shellstream.str();
-    				system( shellstream.str().c_str() );
+				if(!command.compare("start"))
+				{
+
+					shellstream << " " << dirname;
+    					LOG_CLOG( log_debug_0 ) << shellstream2.str(); 
+    					LOG_CLOG( log_debug_0 ) << shellstream.str(); 
+    					system( shellstream2.str().c_str() );
+    					system( shellstream.str().c_str() );
+				}
+				else
+				{
+					shellstream2 << " default"; 
+    					LOG_CLOG( log_debug_0 ) << shellstream.str();
+    					system( shellstream.str().c_str() );
+					if( !opts_map["start-stop-default-stream"].empty() )
+					{
+    						LOG_CLOG( log_debug_0 ) << shellstream2.str();
+    						system( shellstream2.str().c_str() );
+					}
+				}
 			}
 			else
 				LOG_CLOG( log_error ) << "Invalid message. Ignoring...";
