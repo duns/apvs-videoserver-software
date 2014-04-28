@@ -11,4 +11,5 @@ gstreamer0.10-plugins-base-dbg gstreamer0.10-plugins-base-doc gstreamer0.10-plug
 gstreamer0.10-plugins-good gstreamer0.10-plugins-good-doc gstreamer0.10-plugins-ugly \
 gstreamer0.10-plugins-ugly-doc gstreamer0.10-pocketsphinx gstreamer0.10-pulseaudio \
 gstreamer0.10-qapt gstreamer0.10-sdl gstreamer0.10-tools gstreamer0.10-vaapi gstreamer0.10-vaapi-doc gstreamer0.10-x \
-libgstreamermm-0.10-2 libgstreamermm-0.10-dbg libgstreamermm-0.10-dev libgstreamermm-0.10-doc
+libgstreamermm-0.10-2 libgstreamermm-0.10-dbg libgstreamermm-0.10-dev libgstreamermm-0.10-doc \
+vlc browser-plugin-vlc
