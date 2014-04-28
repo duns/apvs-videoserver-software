@@ -1,4 +1,5 @@
 videosink/bin
+video-socket-service/bin
 
 # Compiled Object files
 *.slo
