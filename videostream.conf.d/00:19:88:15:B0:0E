@@ -1,0 +1,37 @@
+[connection]
+transfer-protocol=TCP 
+localhost=137.138.61.145
+port=5010
+[localvideosource]
+video-header=video/x-raw-yuv
+width=640
+height=480
+framerate-num=10
+framerate-den=1
+fourcc-format0=I
+fourcc-format1=4
+fourcc-format2=2
+fourcc-format3=0
+interlaced=false
+pattern=13
+[videobackup]
+output-path=/mnt/datadisk1/videostreams/PTU-06
+[capturedevice]
+name=/dev/video5
+[imageoverlay]
+img-location=/etc/videostream.conf.d/alphaempty_640x480.png
+[timeoverlay]
+halignment=2
+font=xxx xxx 13
+[clockoverlay]
+enable-clock=true
+halignment=0
+valignment=2
+shaded-background=false
+time-format=%H:%M:%S
+font=xxx xxx 13
+[execution]
+messages-detail=5
+l1-watchdog-awareness=1000
+l2-watchdog-awareness=5000
+hard-reset=1800000

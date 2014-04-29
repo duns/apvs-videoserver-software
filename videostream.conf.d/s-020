@@ -1,0 +1,7 @@
+[slot-details]
+id=test0
+[streaming-ports]
+mjpg=18090
+rtp=18091
+rtsp=18092
+mp4=18093

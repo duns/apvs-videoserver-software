@@ -1,0 +1,7 @@
+[slot-details]
+id=worker3
+[streaming-ports]
+mjpg=8390
+rtp=8391
+rtsp=8392
+mp4=8393

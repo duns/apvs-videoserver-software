@@ -1,0 +1,7 @@
+[slot-details]
+id=worker4
+[streaming-ports]
+mjpg=8490
+rtp=8491
+rtsp=8492
+mp4=8493
