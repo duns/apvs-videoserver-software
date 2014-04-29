@@ -19,8 +19,9 @@
 umask 0000
 PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 DESC="videoserver socket"
-DAEMON=/usr/src/wpss-src/server-software/video-socket-service/bin/videosockserver
+#DAEMON=/usr/src/wpss-src/server-software/video-socket-service/bin/videosockserver
 #DAEMON=/usr/local/videoserver/workerserver.sh
+DAEMON=/home/duns/git/apvs-videoserver-software/video-socket-service/bin/videosockserver
 DAEMON_ARGS="--listening-port 20000 --server-script /etc/init.d/videoserver-single --verbosity 5 --start-stop-default-stream"
 NAME=videosockserver
 LOGFILENAME="/var/log/videoserver/videosockserver"`date +"%y%m%d"`.log

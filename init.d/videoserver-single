@@ -19,7 +19,7 @@
 umask 0000
 PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
 DESC="videoserver service (single instance)"
-DAEMON=/usr/src/wpss-src/server-software/videosink/scripts/videoserver.sh
+DAEMON=/home/duns/git/apvs-videoserver-software/videosink/scripts/videoserver.sh
 #DAEMON_ARGS="--options args"
 CONFFILE=/etc/videostream.conf.d/videoserver.conf
 PTU_ID=${2}

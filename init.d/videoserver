@@ -24,6 +24,7 @@ NAME=videoserver
 DAEMON=/usr/local/videoserver/workerserver_1cam.sh
 DAEMON=/usr/local/videoserver/workerserver_videosource.sh
 DAEMON=/usr/src/wpss-src/server-software//videosink/scripts/videoserver_all.sh
+DAEMON=/home/duns/git/apvs-videoserver-software/videosink/scripts/videoserver_all.sh
 #DAEMON=/usr/local/videoserver/workerserver.sh
 #DAEMON_ARGS="--options args"
 #DAEMON_ARGS="00:00:00:00:00:00 0 t01 /var/log/videoserver"
